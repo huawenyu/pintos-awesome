@@ -56,8 +56,7 @@ page}.
 @node Version Control
 @section Version Control
 
-@c @include localvcinstructions.texi
-Coming soon...
+@include localvcinstructions.texi
 
 @node Virtual Machine
 @section Virtual Machine
