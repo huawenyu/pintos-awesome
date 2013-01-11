@@ -1,0 +1,34 @@
+@node Project 2--Pintos Bootloader
+@chapter Project 2:  Pintos Bootloader
+
+In this assignment you will begin to get familiar with the Pintos project
+and how to run it in an emulator.  Also, Pintos is lacking one important
+component - a bootloader.  Besides becoming familiar with the codebase, your
+task will be to write the bootloader that brings the Pintos kernel into
+memory, and then starts the kernel running.
+
+The code you will have to write this week is simpler than the code you will
+have to write in subsequent projects; this is because you will need to learn
+the Pintos tools as well as write your code.
+
+@menu
+* Project 2 Background::        
+* Project 2 Requirements::      
+* Project 2 Suggested Order of Implementation::  
+@end menu
+
+@node Project 2 Background
+@section Background
+
+Coming soon!
+
+@node Project 2 Requirements
+@section Requirements
+
+Coming soon!
+
+@node Project 2 Suggested Order of Implementation
+@section Suggested Order of Implementation
+
+Coming soon!
+

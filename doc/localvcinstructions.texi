@@ -1,0 +1,95 @@
+@c
+@c Instructions on how to set up a group environment, permissions, 
+@c code repository, dealing with local locking issues etc.
+@c
+@c While some of the discussion may apply to more than one environment,
+@c no attempt was made to untangle and split the discussion.
+@c
+
+@menu
+* Setting Up Git::
+* Using Git::
+* Submitting Assignments::
+@end menu
+
+@node Setting Up Git
+@subsection Setting Up Git
+
+The Pintos codebase is rather substantial, and you will be working in teams
+to develop some complex features on the project.  In situations like this,
+a version control system is absolutely essential so that you can coordinate
+your interactions with the codebase, and so you can record checkpoints of
+your work as you go.  Additionally, you will submit your work using the
+version-control system so that we can retrieve and grade what you have done.
+
+We will be using the Git distributed version control system for
+@value{coursenumber}.  You can install Git onto your local machine from the
+following website:  http://git-scm.com/.  (It is already installed on the
+CMS cluster if you decide to work there.)  There are installers for all
+major operating systems.  Once Git is installed, you can follow the
+instructions below to get started on Pintos.
+
+@strong{You must also have a CMS cluster account for @value{coursenumber}.}
+This is how you will retrieve the source code, and how you will submit your
+homework.  Make sure you can log in to the CMS cluster as soon as possible.
+
+@enumerate
+
+@item The first thing you need to do is to inform Donnie about who are your
+      team members so that he can set up a Pintos Git repository for your
+      team to use.  Once this is done, he can inform you of the repository's
+      path.
+
+@item Once your team's repository is set up, you will need to figure out a
+      location to work.  You can work on your local computer, on the CMS
+      cluster, or wherever you feel comfortable doing so.  (If you decide to
+      change where you do your assignments, you will need to complete these
+      setup instructions again.) I usually work within a @file{projects}
+      directory on my laptop, but perhaps you will want to create a
+      @file{@value{coursenumber}} directory for yourself to work in.
+
+@item Once you have figured this out, you will clone your team's repository
+      containing the initial Pintos source code, into whatever location you
+      have chosen to work.  This means that you are making a complete copy
+      of the team repository (which Git calls "origin") for yourself to work
+      against.  You will be able to make whatever changes you want to this
+      repository without affecting the original repository that you cloned.
+      However, as new versions of Pintos are made available to you, you
+      can easily pull these changes from the original repository with a
+      single command.
+
+      Run the following command, replacing @var{username} with your CMS
+      cluster username.  It will create a local copy of the specified
+      repository, in a directory named pintos-repo.
+
+      @command{git clone @var{username}@login.cs.caltech.edu:/cs/courses/cs101os/wi1213/pintos-repo}
+
+      Once you have done this, you can run "@command{git remote -v}" to see
+      that this repository is now nicknamed “origin”, as stated earlier.  (You only have read-only access to this repository, since you don’t want to accidentally clobber the initial source code.)
+3.	Configure Git with your user information.  The double-quotes in these commands are necessary if you have spaces in the values you specify.
+git config --global user.name "Your Name"
+git config --global user.email "your@email.tld"
+You will probably also find it helpful to turn on colorful output:
+git config --global color.ui true
+4.	Next you will tell Git where you will submit your work.  (We do this now so you don’t have to type a long repository string all the time.)  When you are finished with each assignment, you will push your local repository state to this repository on the CMS cluster.  Note that each student has their own separate submission repository.
+Change into your local nanodb-repo directory, and replace username with your CMS cluster username.  Note that username appears twice in the command.
+git remote add submission \
+    username@login.cs.caltech.edu:/cs/courses/cs122/wi1112/submissions/username
+Again, once you do this, you should see the name “submission” when you run the command “git remote -v”.
+When you are ready to submit your work, you will do so by pushing your local repository changes to the “submission” repository, with a command like this:
+git push submission [options ...]
+In the future there will be additional options so that we can identify the assignment you are submitting, but that is the basic form.  You should try it right now to see if it works:
+git push submission --all
+(The --all is necessary the first time since you are pushing to an empty repository.)
+Additionally, you can use this repository on the CMS cluster to back up your local repository anytime you want to be sure you don’t lose your work.  Just push your changes to your submission repository on the CMS cluster using “git push submission”.
+Now you should be ready to try out NanoDB!
+Git Repository Details
+You should be aware that your local repository actually contains two components in one.  First, you will see directories and files like src, build.xml, test, etc.  These are actually not part of the Git repository itself; they are a working copy that you can edit separately.  If you decide you don’t like the changes you have made in your working copy, you can always revert back to the repository version with no problems.
+When you are completely satisfied with your changes, then you can commit these changes to your repository.  The repository itself is stored in a subdirectory named .git, which you can see if you type “ls -al”.  (Feel free to look in this directory, but don’t muck with anything in there.)
+
+
+
+
+
+
+
