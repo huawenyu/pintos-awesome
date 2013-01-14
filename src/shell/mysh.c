@@ -42,9 +42,25 @@ int invoke(char *command) {
 
     // Actually do the command and forking etc.
     //char *arg_strings[] = {"cat", "< blah.txt"};
-    char *arg_strings[] = {"ls"};
-    char *real_argv[] = {"ls", NULL};
+    char *arg_strings[] = {"ls", "-l"};
     char *rest = "";
+    // Get the argv array that'll be passed to the process.
+    int num_args = sizeof(arg_strings) / sizeof(arg_strings[0]);
+    // Assuming that any < and > commands are at the end.
+    if(arg_strings[num_args-1][0] == '<' || arg_strings[num_args-1][0] == '>') {
+        num_args = num_args - 1;
+    }
+    // If the last command was a redirect, then num_args was decremented and this is
+    // the second to last, else this is the same comparison
+    if(arg_strings[num_args-1][0] == '<' || arg_strings[num_args-1][0] == '>') {
+        num_args = num_args - 1;
+    }
+    char **real_argv = (char **)malloc((num_args+1) * sizeof(char *));
+    if(memcpy((void *)real_argv, (const void*)arg_strings, num_args * sizeof(char *)) == NULL) {
+        perror("memcpy error");
+        exit(EXIT_FAILURE);
+    }
+    real_argv[num_args] = NULL;
     if(strcmp(arg_strings[0], "cd") == 0 || strcmp(arg_strings[0], "chdir") == 0) {
     } else if(strcmp(arg_strings[0], "exit") == 0 ) {
         exit(EXIT_SUCCESS);
@@ -69,6 +85,8 @@ int invoke(char *command) {
         } else { // Parent
             int status;
             waitpid(pid, &status, 0);
+            free(real_argv);
+            //free(arg_strings);
         }       
     }
 
