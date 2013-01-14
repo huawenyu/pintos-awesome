@@ -1,4 +1,9 @@
 #include <errno.h>
+#include <fcntl.h>
+// Apparently not technically required but might be useful
+#include <sys/types.h>
+#include <sys/stat.h>
+//
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,29 +49,32 @@ int invoke(char *command) {
     // TODO: Logic to split the string (use parse_pipes)
 
     // Actually do the command and forking etc.
-    //char *arg_strings[] = {"cat", "< blah.txt"};
-    char *arg_strings[] = {"ls", "-l"};
+    char *arg_strings[] = {"cat", "<", "mysh.c", ">", "test.txt"};
     char *rest = "";
     // Get the argv array that'll be passed to the process.
     int num_args = sizeof(arg_strings) / sizeof(arg_strings[0]);
+    int arg_idx = num_args;
+    int num_redir = 0;
     // Assuming that any < and > commands are at the end.
-    if(arg_strings[num_args-1][0] == '<' || 
-       arg_strings[num_args-1][0] == '>') {
-        num_args = num_args - 1;
+    if(arg_strings[arg_idx-2][0] == '<' || 
+       arg_strings[arg_idx-2][0] == '>') {
+        arg_idx = arg_idx - 2;
+        num_redir = num_redir + 1;
     }
-    // If the last command was a redirect, then num_args was decremented and 
+    // If the last command was a redirect, then arg_idx was decremented and 
     // this is the second to last, else this is the same comparison
-    if(arg_strings[num_args-1][0] == '<' || 
-       arg_strings[num_args-1][0] == '>') {
-        num_args = num_args - 1;
+    if(arg_strings[arg_idx-2][0] == '<' || 
+       arg_strings[arg_idx-2][0] == '>') {
+        arg_idx = arg_idx - 2;
+        num_redir = num_redir + 1;
     }
     char **real_argv = (char **)malloc((num_args+1) * sizeof(char *));
     if(memcpy((void *)real_argv, (const void*)arg_strings, 
-               num_args * sizeof(char *)) == NULL) {
+               arg_idx * sizeof(char *)) == NULL) {
         perror("memcpy error");
         exit(EXIT_FAILURE);
     }
-    real_argv[num_args] = NULL;
+    real_argv[arg_idx] = NULL;
     if(strcmp(arg_strings[0], "cd") == 0 || 
        strcmp(arg_strings[0], "chdir") == 0) {
        // TODO change directory
@@ -87,7 +95,26 @@ int invoke(char *command) {
             // Assuming that pipes and I/O redirection aren't being 
             // simultaneously used in a way where something would stomp over 
             // things.
-            // I/O indirection TODO
+            // I/O indirection
+            int bracket_idx = num_args - 2;
+            int filename_idx = num_args - 1;
+            while(num_redir > 0) {
+                if(arg_strings[bracket_idx][0] == '<') { // In
+                   int in_fd = open((const char*) arg_strings[filename_idx], 
+                                    O_RDONLY); 
+                   dup2(in_fd, STDIN_FILENO); // Replace stdin
+                   close(in_fd);
+                } else { // Out
+                   int out_fd = open((const char*) arg_strings[filename_idx],
+                                     O_CREAT | O_TRUNC | O_WRONLY,
+                                     S_IRUSR | S_IWUSR);
+                   dup2(out_fd, STDOUT_FILENO); // Replace stdout
+                   close(out_fd);
+                }
+                num_redir = num_redir - 1;
+                bracket_idx = bracket_idx - 2;
+                filename_idx = filename_idx - 2;
+            } 
 
             // Run the process
             if(execvp(arg_strings[0], real_argv) == -1) {
