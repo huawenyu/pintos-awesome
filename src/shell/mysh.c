@@ -13,14 +13,15 @@ Input:
                           command. Caller should free this array when 
                           done. This array will include redirection
                           stuff (like "< blah.txt", "> foo.txt").
+    - size_t *num_arg_strings: size(arg_strings)
 
 Output (char *): Pointer to the unused remainder of the string. 
 */
-char *parse_pipes(char *command, char **arg_strings) {
+char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
     // Keep track of array size so we can resize.
-    size_t num_arg_strings = 0; 
+    *num_arg_strings = 0; 
 
-    //TODO
+    //TODO (oh god this is annoying)
 }
 
 /*
@@ -33,6 +34,10 @@ Input:
 Output (int): Zero if success, -1 if something failed
 */
 int invoke(char *command) {
+    // TODO: Logic to split the string
+
+    // TODO: Forking logic (and in there, set up file redirects and crap)
+
     // TODO
 }
 
