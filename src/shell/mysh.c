@@ -11,9 +11,10 @@ Input:
     - char *command: The command string.
     - char **arg_strings: The array of argument strings from the first 
                           command. Caller should free this array when 
-                          done. 
+                          done. This array will include redirection
+                          stuff (like "< blah.txt", "> foo.txt").
 
-Output: Pointer to the unused remainder of the string. 
+Output (char *): Pointer to the unused remainder of the string. 
 */
 char *parse_pipes(char *command, char **arg_strings) {
     // Keep track of array size so we can resize.
@@ -22,6 +23,18 @@ char *parse_pipes(char *command, char **arg_strings) {
     //TODO
 }
 
+/*
+invoke: Takes a command string and forks a child process to run the first command and
+(recursively) fork further child processes to run the remaining piped commands, etc.
+
+Input:
+    - char *command: The command string
+
+Output (int): Zero if success, -1 if something failed
+*/
+int invoke(char *command) {
+    // TODO
+}
 
 int main(int argc, char* argv[]) {
 
