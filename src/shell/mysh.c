@@ -74,6 +74,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
                 idx = (int)(delim_test - command) - 1;
                 continue;
              }
+             num_false_spaces = 0;
 
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 1)*sizeof(char *));
@@ -214,6 +215,7 @@ int invoke(char *command, int pipe_fd) {
         if(real_argv[i][0] == '"') { 
             char *temp = real_argv[i][0];
             real_argv[i] = strndup(real_argv[i]+1, strlen(real_argv[i])-2);
+            free(temp);
         }
     }
     if(strcmp(arg_strings[0], "cd") == 0 || 
