@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 // Apparently not technically required but might be useful
@@ -31,9 +32,116 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
     // Keep track of array size so we can resize.
     *num_arg_strings = 0; 
 
-    //TODO (oh god this is annoying)
+    // Kill leading whitespace
+    for(; *command == ' '; ++command) {}
+    char* last_cmd_ptr = command;
+    int idx;
+    int num_false_spaces = 0;
+    for(idx = 0; idx < strlen(command); ++idx) {
+        char *cur_cmd_ptr = command + idx;
 
-    return NULL;
+        if(idx == strlen(command)-1) {
+             void *ptr = realloc(arg_strings, 
+                                 ((*num_arg_strings) + 1)*sizeof(char *));
+             assert(ptr != NULL);
+
+             *num_arg_strings = (*num_arg_strings) + 1;
+             arg_strings[(*num_arg_strings) - 1] = 
+                 strndup(last_cmd_ptr, (int)(cur_cmd_ptr - last_cmd_ptr));
+
+             return command + idx; // Pointer to the \0 in command (no 'rest')
+        } else if(*cur_cmd_ptr == ' ') {
+             // Make sure there are no other delimiting characters before
+             // next information (look ahead)
+             char *delim_test = cur_cmd_ptr;
+             int false_space = 0;
+             while(*delim_test == ' ' || *delim_test == '<' ||
+                   *delim_test == '>' || *delim_test == '|') {
+                if(*delim_test == '<' || *delim_test == '>' ||
+                   *delim_test == '|') {
+                    false_space = 1;
+                    break;
+                }
+                delim_test = delim_test + 1;
+                num_false_spaces = num_false_spaces + 1;
+             }
+
+             // delim_test is now at the correct delimiter; set the idx
+             // so that the next go-around deals with that
+             if(false_space == 1) {
+                idx = (int)(delim_test - command) - 1;
+                continue;
+             }
+
+             void *ptr = realloc(arg_strings, 
+                                 ((*num_arg_strings) + 1)*sizeof(char *));
+             assert(ptr != NULL);
+             *num_arg_strings = (*num_arg_strings) + 1;
+             arg_strings[(*num_arg_strings) - 1] = 
+                 strndup(last_cmd_ptr, (int)(cur_cmd_ptr - last_cmd_ptr));
+
+             // Set last_cmd_ptr and idx knowing that delim_test is at the next
+             // non-delim character:
+             last_cmd_ptr = delim_test;
+             idx = (int)(delim_test - command) - 1;
+             if(delim_test == command+strlen(command)-1) {
+                 // Command ends in spaces
+                 return command + strlen(command)-1;
+             }
+        } else if (*cur_cmd_ptr == '<') {
+             void *ptr = realloc(arg_strings, 
+                                 ((*num_arg_strings) + 2)*sizeof(char *));
+             assert(ptr != NULL);
+             *num_arg_strings = (*num_arg_strings) + 2;
+             arg_strings[(*num_arg_strings) - 1] = strndup("<", 1);
+             arg_strings[(*num_arg_strings) - 2] = 
+                 strndup(last_cmd_ptr, 
+                         (int)(cur_cmd_ptr - last_cmd_ptr) - num_false_spaces);
+             num_false_spaces = 0;
+
+             // Find the next non-space character (assume that there are no
+             // other delimeters before the next word, cause we need something
+             // to redirect to/from)
+             char *delim_test = cur_cmd_ptr + 1;
+             for(; *delim_test == ' '; ++delim_test) {}
+             last_cmd_ptr = delim_test;
+             idx = (int)(delim_test - command) - 1;
+        } else if (*cur_cmd_ptr == '>') {
+             void *ptr = realloc(arg_strings, 
+                                 ((*num_arg_strings) + 2)*sizeof(char *));
+             perror("realloc");
+             assert(ptr != NULL);
+             *num_arg_strings = (*num_arg_strings) + 2;
+             arg_strings[(*num_arg_strings) - 1] = strndup(">", 1);
+             arg_strings[(*num_arg_strings) - 2] = 
+                 strndup(last_cmd_ptr, 
+                         (int)(cur_cmd_ptr - last_cmd_ptr) - num_false_spaces);
+             num_false_spaces = 0;
+             
+             // Find the next non-space character (assume that there are no
+             // other delimeters before the next word, cause we need something
+             // to redirect to/from)
+             char *delim_test = cur_cmd_ptr + 1;
+             for(; *delim_test == ' '; ++delim_test) {}
+             last_cmd_ptr = delim_test;
+             idx = (int)(delim_test - command) - 1;
+        } else if (*cur_cmd_ptr == '|') {
+             void *ptr = realloc(arg_strings, 
+                                 ((*num_arg_strings) + 1)*sizeof(char *));
+             assert(ptr != NULL);
+             *num_arg_strings = (*num_arg_strings) + 1;
+             arg_strings[(*num_arg_strings) - 1] = 
+                 strndup(last_cmd_ptr, 
+                         (int)(cur_cmd_ptr - last_cmd_ptr) - num_false_spaces);
+             num_false_spaces = 0;
+
+            return command+idx+1; // Pointer to one past the pipe
+        }
+        // Otherwise do nothing -- we're in the middle of a word
+
+    }
+
+    return NULL; // If it gets here, something went wrong.
 }
 
 /*
@@ -56,31 +164,31 @@ int invoke(char *command) {
         cur_cmd_ptr = strchr(cur_cmd_ptr, '|') + 1;
     }
 
-    // TODO: Logic to split the string (use parse_pipes)
+    // Parse the command
+    char **arg_strings = malloc(sizeof(char *));
+    size_t num_args = 0;
+    char *rest = parse_pipes(command, arg_strings, &num_args);
 
     // Actually do the command and forking etc.
-    char *arg_strings[] = {"cat", "<", "mysh.c", ">", "test.txt"};
-    char *rest = "";
     // Get the argv array that'll be passed to the process.
-    int num_args = sizeof(arg_strings) / sizeof(arg_strings[0]);
     int arg_idx = num_args;
     int num_redir = 0;
     // Assuming that any < and > commands are at the end.
-    if(arg_strings[arg_idx-2][0] == '<' || 
-       arg_strings[arg_idx-2][0] == '>') {
+    if(arg_idx > 2 && (arg_strings[arg_idx-2][0] == '<' || 
+       arg_strings[arg_idx-2][0] == '>')) {
         arg_idx = arg_idx - 2;
         num_redir = num_redir + 1;
     }
-    // If the last command was a redirect, then arg_idx was decremented and 
+    // If the last command was a redirect, then arg_idx was decremented and
     // this is the second to last, else this is the same comparison
-    if(arg_strings[arg_idx-2][0] == '<' || 
-       arg_strings[arg_idx-2][0] == '>') {
+    if(arg_idx > 2 && (arg_strings[arg_idx-2][0] == '<' || 
+       arg_strings[arg_idx-2][0] == '>')) {
         arg_idx = arg_idx - 2;
         num_redir = num_redir + 1;
     }
     char **real_argv = (char **)malloc((num_args+1) * sizeof(char *));
     if(real_argv == NULL) {
-        printf(stderr, "malloc error\n");
+        fprintf(stderr, "malloc error\n");
         return -1;
     }
     if(memcpy((void *)real_argv, (const void*)arg_strings, 
@@ -145,12 +253,14 @@ int invoke(char *command) {
             int status;
             // Wait for all piped children
             int i;
-            for(i=0; i < num_pipes + 1; ++i) {
-                waitpid(-getgid(), &status, 0);
+            for(i = 0; i < num_pipes + 1; ++i) {
+                pid_t w = waitpid(-getgid(), &status, 0);
+                if(w == -1) { perror("waitpid"); exit(EXIT_FAILURE); }
             }
-            // TODO: Free the strings inside arg_strings 
-            // (want to implement parse_pipes first)
-            //free(arg_strings);
+            for(i = 0; i < num_args; ++i) {
+                free(arg_strings[i]);
+            }
+            free(arg_strings);
             free(real_argv);
         }       
     }
@@ -160,7 +270,7 @@ int invoke(char *command) {
 
 int main(int argc, char *argv[]) {
     // Create a new group for later
-    setpgid(0, 0); // Set group to current PID
+    setpgid(getpid(), getpid()); // Set group to current PID
     // Loop FOREVER
     while(1) {
         char *uname = getlogin();
@@ -168,6 +278,7 @@ int main(int argc, char *argv[]) {
         gethostname(host, 250);
         char cwd[250];
         getcwd(cwd, 250);
+        fflush(stdout);
         fprintf(stdout, "%s@%s:%s$$$ ", uname, host, cwd);
         char buf[1024];
         fgets(buf, 1024, stdin);
