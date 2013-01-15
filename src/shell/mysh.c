@@ -50,7 +50,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
                  strndup(last_cmd_ptr, (int)(cur_cmd_ptr - last_cmd_ptr));
 
              return command + idx; // Pointer to the \0 in command (no 'rest')
-        } else if(*cur_cmd_ptr == ' ') {
+        } else if(*cur_cmd_ptr == ' ') { //TODO: ignore space if inside quotes
              // Make sure there are no other delimiting characters before
              // next information (look ahead)
              char *delim_test = cur_cmd_ptr;
