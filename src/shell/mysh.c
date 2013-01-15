@@ -196,7 +196,7 @@ int invoke(char *command, int pipe_fd) {
     }
 
     // Make the argv array
-    char **real_argv = (char **)malloc((num_args+1) * sizeof(char *));
+    char **real_argv = (char **)malloc((arg_idx+1) * sizeof(char *));
     if(real_argv == NULL) {
         fprintf(stderr, "malloc error\n");
         return -1;
