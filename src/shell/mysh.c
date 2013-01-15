@@ -33,7 +33,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
     *num_arg_strings = 0; 
 
     // Kill leading whitespace
-    for(; *command == ' '; ++command) {}
+    for(; *command == ' ' || *command == '\t'; ++command) {}
     char* last_cmd_ptr = command;
     int idx;
     int num_false_spaces = 0;
@@ -41,7 +41,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
     for(idx = 0; idx < strlen(command); ++idx) {
         char *cur_cmd_ptr = command + idx;
 
-        if(idx == strlen(command)-1) {
+        if(idx == strlen(command)-1){
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 1)*sizeof(char *));
              assert(ptr != NULL);
@@ -57,7 +57,8 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              // next information (look ahead)
              char *delim_test = cur_cmd_ptr;
              int false_space = 0;
-             while(*delim_test == ' ' || *delim_test == '<' ||
+             while(*delim_test == ' ' || *delim_test == '\t' ||
+                   *delim_test == '<' ||
                    *delim_test == '>' || *delim_test == '|') {
                 if(*delim_test == '<' || *delim_test == '>' ||
                    *delim_test == '|') {
@@ -106,7 +107,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              // other delimeters before the next word, cause we need something
              // to redirect to/from)
              char *delim_test = cur_cmd_ptr + 1;
-             for(; *delim_test == ' '; ++delim_test) {}
+             for(; *delim_test == ' ' || *delim_test == '\t'; ++delim_test) {}
              last_cmd_ptr = delim_test;
              idx = (int)(delim_test - command) - 1;
         } else if (*cur_cmd_ptr == '>') {
@@ -125,7 +126,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              // other delimeters before the next word, cause we need something
              // to redirect to/from)
              char *delim_test = cur_cmd_ptr + 1;
-             for(; *delim_test == ' '; ++delim_test) {}
+             for(; *delim_test == ' ' || *delim_test == '\t'; ++delim_test) {}
              last_cmd_ptr = delim_test;
              idx = (int)(delim_test - command) - 1;
         } else if (*cur_cmd_ptr == '|') {
