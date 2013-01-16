@@ -18,7 +18,8 @@ string.
 
 Input:
     - char *command: The command string.
-    - char ***arg_string_ptr: Pointer to the array of argument strings from the first 
+    - char ***arg_string_ptr: Pointer to the array of argument strings 
+                          from the first 
                           command. Caller should free this array when 
                           done. This array will include redirection
                           stuff (like "<", "blah.txt", ">", foo.txt")
@@ -28,7 +29,8 @@ Input:
 
 Output (char *): Pointer to the unused remainder of the string. 
 */
-char *parse_pipes(char *command, char ***arg_string_ptr, size_t *num_arg_strings) {
+char *parse_pipes(char *command, char ***arg_string_ptr, 
+                  size_t *num_arg_strings) {
     char **arg_strings = *arg_string_ptr;
     // Keep track of array size so we can resize.
     *num_arg_strings = 0; 
@@ -336,7 +338,7 @@ int main(int argc, char *argv[]) {
         char cwd[250];
         getcwd(cwd, 250);
         fflush(stdout);
-        fprintf(stdout, "%s@%s:%s$$$ ", uname, host, cwd);
+        fprintf(stdout, "%s@%s:%s>> ", uname, host, cwd);
         char buf[1024];
         fgets(buf, 1024, stdin);
         invoke(buf, -1);
