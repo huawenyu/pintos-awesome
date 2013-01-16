@@ -226,9 +226,7 @@ int invoke(char *command, int pipe_fd) {
     int i;
     for(i = 0; i < arg_idx; ++i) {
         if(real_argv[i][0] == '"') { 
-            char *temp = real_argv[i][0];
             real_argv[i] = strndup(real_argv[i]+1, strlen(real_argv[i])-2);
-            free(temp);
         }
     }
     if(strcmp(arg_strings[0], "cd") == 0 || 
