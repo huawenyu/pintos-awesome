@@ -18,7 +18,7 @@ string.
 
 Input:
     - char *command: The command string.
-    - char **arg_strings: The array of argument strings from the first 
+    - char ***arg_string_ptr: Pointer to the array of argument strings from the first 
                           command. Caller should free this array when 
                           done. This array will include redirection
                           stuff (like "<", "blah.txt", ">", foo.txt")
@@ -28,7 +28,8 @@ Input:
 
 Output (char *): Pointer to the unused remainder of the string. 
 */
-char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
+char *parse_pipes(char *command, char ***arg_string_ptr, size_t *num_arg_strings) {
+    char **arg_strings = *arg_string_ptr;
     // Keep track of array size so we can resize.
     *num_arg_strings = 0; 
 
@@ -45,11 +46,13 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 1)*sizeof(char *));
              assert(ptr != NULL);
+             arg_strings = ptr;
 
              *num_arg_strings = (*num_arg_strings) + 1;
              arg_strings[(*num_arg_strings) - 1] = 
                  strndup(last_cmd_ptr, (int)(cur_cmd_ptr - last_cmd_ptr));
 
+             *arg_string_ptr = arg_strings;
              return command + idx; // Pointer to the \0 in command (no 'rest')
         } else if(*cur_cmd_ptr == ' ' || *cur_cmd_ptr == '\t') { 
              if(inside_quotes == 1) { continue; }
@@ -80,6 +83,7 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 1)*sizeof(char *));
              assert(ptr != NULL);
+             arg_strings = ptr;
              *num_arg_strings = (*num_arg_strings) + 1;
              arg_strings[(*num_arg_strings) - 1] = 
                  strndup(last_cmd_ptr, (int)(cur_cmd_ptr - last_cmd_ptr));
@@ -90,12 +94,14 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              idx = (int)(delim_test - command) - 1;
              if(delim_test == command+strlen(command)-1) {
                  // Command ends in spaces
+                 *arg_string_ptr = arg_strings;
                  return command + strlen(command)-1;
              }
         } else if (*cur_cmd_ptr == '<') {
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 2)*sizeof(char *));
              assert(ptr != NULL);
+             arg_strings = ptr;
              *num_arg_strings = (*num_arg_strings) + 2;
              arg_strings[(*num_arg_strings) - 1] = strndup("<", 1);
              arg_strings[(*num_arg_strings) - 2] = 
@@ -113,8 +119,8 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
         } else if (*cur_cmd_ptr == '>') {
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 2)*sizeof(char *));
-             perror("realloc");
              assert(ptr != NULL);
+             arg_strings = ptr;
              *num_arg_strings = (*num_arg_strings) + 2;
              arg_strings[(*num_arg_strings) - 1] = strndup(">", 1);
              arg_strings[(*num_arg_strings) - 2] = 
@@ -133,12 +139,14 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
              void *ptr = realloc(arg_strings, 
                                  ((*num_arg_strings) + 1)*sizeof(char *));
              assert(ptr != NULL);
+             arg_strings = ptr;
              *num_arg_strings = (*num_arg_strings) + 1;
              arg_strings[(*num_arg_strings) - 1] = 
                  strndup(last_cmd_ptr, 
                          (int)(cur_cmd_ptr - last_cmd_ptr) - num_false_spaces);
              num_false_spaces = 0;
 
+            *arg_string_ptr = arg_strings;
             return command+idx+1; // Pointer to one past the pipe
         } else if (*cur_cmd_ptr == '"') { 
             if(inside_quotes == 0) { inside_quotes = 1; }
@@ -147,6 +155,8 @@ char *parse_pipes(char *command, char **arg_strings, size_t *num_arg_strings) {
         // Otherwise do nothing -- we're in the middle of a word
 
     }
+
+    *arg_string_ptr = arg_strings;
 
     return NULL; // If it gets here, something went wrong.
 }
@@ -175,8 +185,10 @@ int invoke(char *command, int pipe_fd) {
 
     // Parse the command
     char **arg_strings = malloc(sizeof(char *));
+    char ***arg_string_ptr = &arg_strings;
     size_t num_args = 0;
-    char *rest = parse_pipes(command, arg_strings, &num_args);
+    char *rest = parse_pipes(command, arg_string_ptr, &num_args);
+    arg_strings = *arg_string_ptr;
 
     // Actually do the command and forking etc.
     // Get the argv array that'll be passed to the process.
@@ -298,7 +310,9 @@ int invoke(char *command, int pipe_fd) {
             int i;
             if(pipe_fd == -1) {
                 for(i = 0; i < num_pipes + 1; ++i) {
-                    pid_t w = waitpid(-getgid(), &status, 0);
+
+                    pid_t w = waitpid(-getpgrp(), &status, 0);
+                    //wait(&status);
                     if(w == -1) { perror("waitpid"); exit(EXIT_FAILURE); }
                 }
             }
