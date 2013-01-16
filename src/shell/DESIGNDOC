@@ -8,15 +8,17 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Daniel Chen <email@domain.com>
+Ilya Nepomnyashchiy <ilyanep@caltech.edu>
+Atharv Vaish <email@domain.com>
 
 >> Specify how many late tokens you are using on this assignment:  
 
+0
+
 >> What is the Git repository and commit hash for your submission?
 
-   Repository URL:  
+   Repository URL: https://github.com/ilyanep/pintos-awesome 
    commit ...
 
 ---- PRELIMINARIES ----
@@ -27,6 +29,8 @@ FirstName LastName <email@domain.example>
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+
+UNIX man pages?
 
 			   COMMAND SHELL
 			   =============
@@ -40,16 +44,36 @@ FirstName LastName <email@domain.example>
 >> parsed by the shell process, or are child processes responsible
 >> for parsing portions of the command?
 
+The main process sends it to the parse_pipes command, which will return
+a pointer to an array containing {"a", "arg1", "arg2"} and then a pointer
+to a string containing "b arg 1 | c arg1 arg2 arg3". The process then
+works on invoking the command determined by the first array and then 
+the child process will work on the rest of the string (recursively calling
+the invoke function).
+
 >> A2: Now, given the command:
 >> "a arg1 arg2 < inp.txt | b arg1 | c arg1 arg2 arg3 > out.txt"
 >> Briefly explain specifically how the redirections are parsed and
 >> represented, and by what processes.
+
+Now, the array returned in the parent is {"a", "arg1", "arg2", "<", "inp.txt"}, with the
+pointer to the rest of the string: "b arg1 | c arg1 arg2 arg3 > out.txt".
+The shell process then notes that there is a "<" or a ">" in the last four
+elements, and then sets up the file descriptors to the filenames. For actually
+calling the command, the child process counts how many of the things in the array
+are for file indirection, and then copies all things in the array that aren't
+into a "real_argv" array and then terminates it in NULL.
 
 ---- ALGORITHMS ----
 
 >> A3: Illustrate how you solved the problem of setting up
 >> redirection in a simple command like "a < inp.txt > out.txt", by
 >> describing what process takes care of the redirection and when.
+
+The child process, after being forked, has access to the arrays as discussed above.
+Earlier (actually in the parent), we counted how many I/O redirections were 
+in the command, so now we just read the arguments from the array that many times
+in the child right before execvp and set up the appropriate descriptors.
 
 >> A4: Illustrate how you solved the problem of setting up the pipes
 >> between multiple operations in a single command, by describing
@@ -58,22 +82,35 @@ FirstName LastName <email@domain.example>
 >> the processes and their pipes, starting with your command shell's
 >> process, and going through the execution of programs a, b and c.
 >> Keep your description of each process' responsibilities limited to
->> ~25 words or less.
+>> ~25 words or less.i
+
+TODO
 
 >> A5: Similarly, describe which processes are responsible for reaping
 >> other terminated processes in the example command "a | b | c".
 
+TODO
+
 >> A6: Similarly, describe which processes are responsible for setting
 >> up the redirections in the example command
 >> "a < inp.txt | b | c > out.txt".
+
+TODO (probably the child process that execs a sets up the first redirection,
+and the child process that execs c sets up the last one)
 
 ---- RATIONALE ----
 
 >> A?: Why do the chdir and exit commands have to be implemented as
 >> built-in functions, rather than external programs?
 
+Because the current working directory is internal state to the command, which another
+function cannot change. Similarly, another program probably cannot kill our shell
+process.
+
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+It seemed the most straightforward to conceptualize and implement. 
 
 			  SURVEY QUESTIONS
 			  ================
@@ -87,12 +124,21 @@ website.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+String parsing is pretty much the worst thing ever. ~Ilya
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+The assignment overall gave me a good idea of how these things work, which I didn't
+actually know before. Also dealing with realloc taught me some lessons about pointers
+that were painful to learn. ~Ilya
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+
+Just the waitpid stuff probably. I might suggest that the parser function uses linked
+lists instead of a char array to save some trouble. ~Ilya
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
