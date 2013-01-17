@@ -9,6 +9,45 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+char **tokenize_pipes(char *input) {
+    int i = 0;
+    int j = 0;
+    int num_pipes = 0;
+    char *curr_input = input;
+    char *substr;
+    char **pipe_tokens;
+
+    curr_input = input;
+    while (strchr(curr_input, '|') != NULL) {
+        num_pipes++;
+        curr_input = strchr(curr_input, '|') + 1;
+    }
+
+    pipe_tokens = malloc(sizeof(char *) * (num_pipes + 1));
+    if (!pipe_tokens) {
+        fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    int cpy_idx = 0;
+    for (i = 0; i < strlen(input); i++) {
+        if (input[i] == '|') {
+            substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+            strncpy(substr, input + cpy_idx, i - cpy_idx);
+            substr[i] = '\0';
+            pipe_tokens[j] = substr;
+            j++;
+            cpy_idx = i + 1;
+        }
+    }
+    substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+    strncpy(substr, input + cpy_idx, i - cpy_idx);
+    substr[i] = '\0';
+    pipe_tokens[j] = substr;
+
+    return pipe_tokens;
+}
+
 char **tokenize(char *input) {
     unsigned int i;
     int new_index = 0;
@@ -131,7 +170,31 @@ void exec_cd(char **tokens) {
     return;
 }
 
+int pipe_invoke(char *input) {
+    unsigned int i, j;
+    char **pipe_tokens = NULL;
+    char **tokens = NULL;
+
+    pipe_tokens = tokenize_pipes(input);
+    printf("Pipe tokens:\n");
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        printf("%s\n", pipe_tokens[i]);
+    }
+    printf("End\n");
+    
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        tokens = tokenize(pipe_tokens[i]);
+        printf("+++\n");
+        for (j = 0; tokens[j] != NULL; j++) {
+            printf("%s\n", tokens[j]);
+        }
+    }
+
+    return 0;
+}
+
 int invoke(char *input) {
+    unsigned int i;
     int input_idx = -1;
     int output_idx = -1;
     char *input_pos = strchr(input, '<');
@@ -200,7 +263,6 @@ int invoke(char *input) {
         tokens = tokenize(input);
     }
     
-    unsigned int i;
     int status;
     
     if (strcmp(tokens[0], "cd") == 0 || strcmp(tokens[0], "chdir") == 0) {
@@ -211,6 +273,7 @@ int invoke(char *input) {
     }
     else {
         pid_t pid = fork();
+        printf("pid: %i\n", pid);
         if (pid == -1) {
             fprintf(stderr, "fork failed: %s\n", strerror(errno));
             exit(EXIT_FAILURE);
@@ -269,6 +332,7 @@ int main() {
         char buf[1024];
         fgets(buf, 1024, stdin);
         int status = invoke(buf);
+        //int status = pipe_invoke(buf);
         if (status) {
             fprintf(stderr, "something failed. \n");
             exit(EXIT_FAILURE);
