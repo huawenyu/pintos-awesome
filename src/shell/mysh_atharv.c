@@ -407,8 +407,20 @@ int pipe_invoke(char *input) {
     if(i == 1 && (strcmp(spec_tokens[0], "exit") == 0 || 
                   strcmp(spec_tokens[0], "cd") == 0   ||
                   strcmp(spec_tokens[0], "chdir") == 0)) { 
+        int derp;
+        int spec_len = sizeof(spec_tokens) / sizeof(spec_tokens[0]);
+        for(derp = 0; derp < spec_len; ++derp) {
+            free(spec_tokens[derp]);
+        }
+        free(spec_tokens);
         return invoke(input);
     }
+    int derp;
+    int spec_len = sizeof(spec_tokens) / sizeof(spec_tokens[0]);
+    for(derp = 0; derp < spec_len; ++derp) {
+        free(spec_tokens[derp]);
+    }
+    free(spec_tokens);
     printf("num_cmds: %d\n", num_cmds);
     int allfiledes[num_cmds - 1][2];
     // Make file descriptor array
@@ -426,8 +438,9 @@ int pipe_invoke(char *input) {
     printf("Running processes...\n+++\n");
     
     // Run all piped processes
+    pid_t pid;
     for (i = 0; i < num_cmds; i++) {
-        pid_t pid = fork();
+        pid = fork();
         printf("pid: %i\n", pid);
         if (pid == -1) {
             fprintf(stderr, "fork failed: %s\n", strerror(errno));
@@ -450,28 +463,27 @@ int pipe_invoke(char *input) {
                 dup2(allfiledes[i][1], STDOUT_FILENO);
                 close(allfiledes[i][1]);
             }
-            printf("Invoking Process no. %d\n", i);
+            fprintf(stderr, "Invoking Process no. %d\n", i);
             invoke(pipe_tokens[i]);
             // Should never get here cause execvp will be called
             exit(EXIT_FAILURE);
         }
         else {
-            // Parent does nothing at this step
+            // Close the file descriptors we've used already
+            if(i > 0) {
+                close(allfiledes[i-1][1]);
+                close(allfiledes[i-1][0]);
+            }
             continue;
-        }
-    }
-
-    // Avoid leaks
-    for (j = 0; j < num_cmds - 1; j++) {
-        for (k = 0; k < 2; k++) {
-            close(allfiledes[j][k]);
         }
     }
 
     // Wait for all children to finish (only main process should ever
     // get here)
+    assert(pid != 0);
     for(i = 0; i < num_cmds; i++) {
         wait(&status);
+        printf("Child %d done!\n", i);
     }
     
     return 0;
