@@ -16,23 +16,23 @@ char **tokenize_pipes(char *input) {
     char *curr_input = input;
     char *substr;
     char **pipe_tokens;
-
+    
     curr_input = input;
     while (strchr(curr_input, '|') != NULL) {
         num_pipes++;
         curr_input = strchr(curr_input, '|') + 1;
     }
-
-    pipe_tokens = malloc(sizeof(char *) * (num_pipes + 1));
+    
+    pipe_tokens = calloc(num_pipes + 1, sizeof(char *) * (num_pipes + 1));
     if (!pipe_tokens) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
-
+    
     int cpy_idx = 0;
     for (i = 0; i < strlen(input); i++) {
         if (input[i] == '|') {
-            substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+            substr = calloc(i - cpy_idx + 1, sizeof(char) * (i - cpy_idx + 1));
             strncpy(substr, input + cpy_idx, i - cpy_idx);
             substr[i] = '\0';
             pipe_tokens[j] = substr;
@@ -40,11 +40,11 @@ char **tokenize_pipes(char *input) {
             cpy_idx = i + 1;
         }
     }
-    substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+    substr = calloc(i - cpy_idx + 1, sizeof(char) * (i - cpy_idx + 1));
     strncpy(substr, input + cpy_idx, i - cpy_idx);
     substr[i] = '\0';
     pipe_tokens[j] = substr;
-
+    
     return pipe_tokens;
 }
 
@@ -146,29 +146,6 @@ char **tokenize(char *input) {
     tokens[num_tokens] = NULL;
     
     return tokens;
-}
-
-int pipe_invoke(char *input) {
-    unsigned int i, j;
-    char **pipe_tokens = NULL;
-    char **tokens = NULL;
-
-    pipe_tokens = tokenize_pipes(input);
-    printf("Pipe tokens:\n");
-    for (i = 0; pipe_tokens[i] != NULL; i++) {
-        printf("%s\n", pipe_tokens[i]);
-    }
-    printf("End\n");
-    
-    for (i = 0; pipe_tokens[i] != NULL; i++) {
-        tokens = tokenize(pipe_tokens[i]);
-        printf("+++\n");
-        for (j = 0; tokens[j] != NULL; j++) {
-            printf("%s\n", tokens[j]);
-        }
-    }
-
-    return 0;
 }
 
 // Changes directory.
@@ -339,6 +316,7 @@ int invoke(char *input) {
         exit(EXIT_SUCCESS);
     }
     else {
+        /**
         pid_t pid = fork();
         if (pid == -1) {
             fprintf(stderr, "fork failed: %s\n", strerror(errno));
@@ -361,6 +339,20 @@ int invoke(char *input) {
         }
         else {
             wait(&status);
+        }
+        **/
+        if (infile) {
+            int in_fd = open(infile, O_RDONLY);
+            dup2(in_fd, STDIN_FILENO);
+            close(in_fd);
+        }
+        if (outfile) {
+            int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY, 0);
+            dup2(out_fd, STDOUT_FILENO);
+            close(out_fd);
+        }
+        if (execvp(tokens[0], tokens) == -1) {
+            fprintf(stderr, "execvp failed: %s\n", strerror(errno));
         }
     }
     
@@ -393,6 +385,82 @@ int invoke(char *input) {
     return 0;
 }
 
+int pipe_invoke(char *input) {
+    int i;
+    int filedes[2];
+    char **pipe_tokens = NULL;
+    int status;
+    int num_cmds;
+    
+    pipe_tokens = tokenize_pipes(input);
+    printf("Pipe tokens:\n");
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        printf("%d: %s\n", i, pipe_tokens[i]);
+    }
+    printf("End\n+++\n");
+    
+    num_cmds = i;
+    printf("num_cmds: %d\n", num_cmds);
+    int allfiledes[num_cmds - 1][2];
+    // Make file descriptor array
+    for (i = 0; i < num_cmds - 1; i++){
+        pipe(filedes);
+        allfiledes[i][0] = filedes[0];
+        allfiledes[i][1] = filedes[1];
+    }
+    int j, k;
+    for (j = 0; j < num_cmds - 1; j++) {
+        for (k = 0; k < 2; k++) {
+            printf("allfiledes[%d][%d] = %d\n", j, k, allfiledes[j][k]);
+        }
+    }
+    printf("Running processes...\n+++\n");
+    
+    // Run all piped processes
+    for (i = 0; i < num_cmds; i++) {
+        pid_t pid = fork();
+        printf("pid: %i\n", pid);
+        if (pid == -1) {
+            fprintf(stderr, "fork failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        // If it's the child, change read/write locations and invoke the process.
+        else if (pid == 0) {
+            printf("Token: %s\n", pipe_tokens[i]);
+            // If it's not the first process, change the read location
+            if (i > 0) {
+                printf("Changing read (%d): Process no. %d\n", allfiledes[i - 1][0], i);
+                close(allfiledes[i - 1][1]);
+                dup2(allfiledes[i - 1][0], STDIN_FILENO);
+                close(STDIN_FILENO);
+            }
+            // If it's not the last process, change the write location
+            if (i < num_cmds - 1) {
+                printf("Changing write (%d): Process no. %d\n", allfiledes[i][1], i);
+                close(allfiledes[i][0]);
+                dup2(allfiledes[i][1], STDOUT_FILENO);
+                close(STDOUT_FILENO);
+            }
+            printf("Invoking Process no. %d\n", i);
+            invoke(pipe_tokens[i]);
+            exit(0);
+        }
+        else {
+            /**
+            for (j = 0; j < num_cmds - 1; j++) {
+                for (k = 0; k < 2; k++) {
+                    close(allfiledes[j][k]);
+                }
+            }
+            **/
+        }
+    }
+    // Wait for all children to finish
+    wait(&status);
+    
+    return 0;
+}
+
 int main() {
     while(1) {
         char *uname = getlogin();
@@ -409,7 +477,7 @@ int main() {
         fprintf(stdout, "%s:%s> ", uname, cwd);
         char buf[1024];
         fgets(buf, 1024, stdin);
-        int status = invoke(buf);
+        int status = pipe_invoke(buf);
         if (status) {
             fprintf(stderr, "something failed. \n");
             exit(EXIT_FAILURE);

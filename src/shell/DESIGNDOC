@@ -44,12 +44,12 @@ UNIX man pages?
 >> parsed by the shell process, or are child processes responsible
 >> for parsing portions of the command?
 
-The main process sends it to the parse_pipes command, which will return
-a pointer to an array containing {"a", "arg1", "arg2"} and then a pointer
-to a string containing "b arg 1 | c arg1 arg2 arg3". The process then
-works on invoking the command determined by the first array and then 
-the child process will work on the rest of the string (recursively calling
-the invoke function).
+The main process calls pipe_invoke, which tokenizes the input on pipes, 
+which produces an array of strings containing "a arg1 arg2 ", " b arg1 ", 
+and " c arg1 arg2 arg3". Then, that process makes N-1 pipes and forks off 
+N children (each child handling a token in the array), changing the read/write 
+file descriptors for each child appropriately. Then, for each child, 
+invoke is called, which tokenizes the input on whitespace and calls execvp.
 
 >> A2: Now, given the command:
 >> "a arg1 arg2 < inp.txt | b arg1 | c arg1 arg2 arg3 > out.txt"
