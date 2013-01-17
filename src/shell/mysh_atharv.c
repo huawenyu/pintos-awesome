@@ -9,6 +9,68 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+char **tokenize_pipes(char *input) {
+    int i = 0;
+    int j = 0;
+    int num_pipes = 0;
+    char *curr_input = input;
+    char *substr;
+    char **pipe_tokens;
+
+    curr_input = input;
+    while (strchr(curr_input, '|') != NULL) {
+        num_pipes++;
+        curr_input = strchr(curr_input, '|') + 1;
+    }
+
+    pipe_tokens = malloc(sizeof(char *) * (num_pipes + 1));
+    if (!pipe_tokens) {
+        fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    int cpy_idx = 0;
+    for (i = 0; i < strlen(input); i++) {
+        if (input[i] == '|') {
+            substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+            strncpy(substr, input + cpy_idx, i - cpy_idx);
+            substr[i] = '\0';
+            pipe_tokens[j] = substr;
+            j++;
+            cpy_idx = i + 1;
+        }
+    }
+    substr = malloc(sizeof(char) * (i - cpy_idx + 1));
+    strncpy(substr, input + cpy_idx, i - cpy_idx);
+    substr[i] = '\0';
+    pipe_tokens[j] = substr;
+
+    return pipe_tokens;
+}
+
+int pipe_invoke(char *input) {
+    unsigned int i, j;
+    char **pipe_tokens = NULL;
+    char **tokens = NULL;
+
+    pipe_tokens = tokenize_pipes(input);
+    printf("Pipe tokens:\n");
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        printf("%s\n", pipe_tokens[i]);
+    }
+    printf("End\n");
+    
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        tokens = tokenize(pipe_tokens[i]);
+        printf("+++\n");
+        for (j = 0; tokens[j] != NULL; j++) {
+            printf("%s\n", tokens[j]);
+        }
+    }
+
+    return 0;
+}
+
 // Cleans up an input and tokenizes it into an array.
 char **tokenize(char *input) {
     unsigned int i;
