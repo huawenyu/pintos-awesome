@@ -194,7 +194,7 @@ void exec_cd(char **tokens) {
 }
 
 // Splits inputs for redirections. Need to free contents of output array.
-char **tok_redirects(char *input) {
+char **tokenize_redirects(char *input) {
     char** tokens = calloc(3, sizeof(char *));
     if (!tokens) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
@@ -313,7 +313,7 @@ char **tok_redirects(char *input) {
 // Invokes a command, assuming it has no pipes.
 int invoke(char *input) {
     // First, we want to determine whether we need any redirects.
-    char **files = tok_redirects(input);
+    char **files = tokenize_redirects(input);
     unsigned int i;
     char *infile = NULL;
     char *outfile = NULL;
