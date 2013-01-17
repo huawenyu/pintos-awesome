@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 char **tokenize_pipes(char *input) {
-    int i = 0;
+    unsigned int i = 0;
     int j = 0;
     int num_pipes = 0;
     char *curr_input = input;
@@ -46,29 +46,6 @@ char **tokenize_pipes(char *input) {
     pipe_tokens[j] = substr;
 
     return pipe_tokens;
-}
-
-int pipe_invoke(char *input) {
-    unsigned int i, j;
-    char **pipe_tokens = NULL;
-    char **tokens = NULL;
-
-    pipe_tokens = tokenize_pipes(input);
-    printf("Pipe tokens:\n");
-    for (i = 0; pipe_tokens[i] != NULL; i++) {
-        printf("%s\n", pipe_tokens[i]);
-    }
-    printf("End\n");
-    
-    for (i = 0; pipe_tokens[i] != NULL; i++) {
-        tokens = tokenize(pipe_tokens[i]);
-        printf("+++\n");
-        for (j = 0; tokens[j] != NULL; j++) {
-            printf("%s\n", tokens[j]);
-        }
-    }
-
-    return 0;
 }
 
 // Cleans up an input and tokenizes it into an array.
@@ -169,6 +146,29 @@ char **tokenize(char *input) {
     tokens[num_tokens] = NULL;
     
     return tokens;
+}
+
+int pipe_invoke(char *input) {
+    unsigned int i, j;
+    char **pipe_tokens = NULL;
+    char **tokens = NULL;
+
+    pipe_tokens = tokenize_pipes(input);
+    printf("Pipe tokens:\n");
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        printf("%s\n", pipe_tokens[i]);
+    }
+    printf("End\n");
+    
+    for (i = 0; pipe_tokens[i] != NULL; i++) {
+        tokens = tokenize(pipe_tokens[i]);
+        printf("+++\n");
+        for (j = 0; tokens[j] != NULL; j++) {
+            printf("%s\n", tokens[j]);
+        }
+    }
+
+    return 0;
 }
 
 // Changes directory.
