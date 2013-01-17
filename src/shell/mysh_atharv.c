@@ -395,14 +395,18 @@ int pipe_invoke(char *input) {
     pipe_tokens = tokenize_pipes(input);
     printf("Pipe tokens:\n");
     for (i = 0; pipe_tokens[i] != NULL; i++) {
-        printf("%d: %s\n", i, pipe_tokens[i]);
+        printf("%d: %s (len: %d)\n", i, pipe_tokens[i], 
+                strlen(pipe_tokens[i]));
     }
     printf("End\n+++\n");
     
     num_cmds = i;
-    if(i == 1 && (strcmp(pipe_tokens[0], "exit") == 0 || 
-                  strcmp(pipe_tokens[0], "cd") == 0   ||
-                  strcmp(pipe_tokens[0], "chdir") == 0)) { 
+    // Running special commands now so that they're run in
+    // the main process, not the forked one.
+    char **spec_tokens = tokenize(pipe_tokens[0]);
+    if(i == 1 && (strcmp(spec_tokens[0], "exit") == 0 || 
+                  strcmp(spec_tokens[0], "cd") == 0   ||
+                  strcmp(spec_tokens[0], "chdir") == 0)) { 
         return invoke(input);
     }
     printf("num_cmds: %d\n", num_cmds);
