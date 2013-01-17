@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// Cleans up an input and tokenizes it into an array.
 char **tokenize(char *input) {
     unsigned int i;
     int new_index = 0;
@@ -25,22 +26,14 @@ char **tokenize(char *input) {
             new_index++;
         }
         else {
-            if (input[i] == ' ') {
-                if (i > 0 && input[i - 1] != ' ') {
-                    input[new_index] = input[i];
+            if (input[i] == ' ' || input[i] == 10 || input[i] == '\t') {
+                if (i > 0 && !(input[i - 1] == ' ' || input[i - 1] == 10 || 
+                    input[i - 1] == '\t')) {
+                    input[new_index] = ' ';
                     new_index++;
                 }
             }
             else {
-                if (input[i] == 10 || input[i] == '\0') {
-                    if (input[new_index - 1] != ' ') {
-                        input[new_index] = '\0';
-                    }
-                    else {
-                        input[new_index - 1] = '\0';
-                    }
-                    break;
-                }
                 if (i == 0 || input[i - 1] == ' ') {
                     num_tokens++;
                 }
@@ -52,8 +45,14 @@ char **tokenize(char *input) {
             }
         }
     }
+    if (input[new_index - 1] == ' ') {
+        input[new_index - 1] = '\0';
+    }
+    else {
+        input[new_index] = '\0';
+    }
     
-    char** tokens = malloc(sizeof(char *) * (num_tokens + 1));
+    char** tokens = calloc(num_tokens + 1, sizeof(char *));
     if (!tokens) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -65,7 +64,7 @@ char **tokenize(char *input) {
     
     for (i = 0; i < strlen(input); i++) {
         if (input[i] == ' ' && !quote) {
-            substr = malloc(sizeof(char) * (i - tok_start + 1));
+            substr = calloc(i - tok_start + 1, sizeof(char));
             if (!substr) {
                 fprintf(stderr, "malloc failed: %s\n", strerror(errno));
                 exit(EXIT_FAILURE);
@@ -90,7 +89,7 @@ char **tokenize(char *input) {
         }
     }
     
-    substr = malloc(sizeof(char) * (i - tok_start + 1));
+    substr = calloc(i - tok_start + 1, sizeof(char));
     if (!substr) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -110,6 +109,7 @@ char **tokenize(char *input) {
     return tokens;
 }
 
+// Changes directory.
 void exec_cd(char **tokens) {
     int stat = 0;
     
@@ -131,78 +131,145 @@ void exec_cd(char **tokens) {
     return;
 }
 
-int invoke(char *input) {
+// Splits inputs for redirections. Need to free contents of output array.
+char **tok_redirects(char *input) {
+    char** tokens = calloc(3, sizeof(char *));
+    if (!tokens) {
+        fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    int quote = 0;
     int input_idx = -1;
     int output_idx = -1;
-    char *input_pos = strchr(input, '<');
-    char *output_pos = strchr(input, '>');
+    unsigned int i;
+    char *temp;
     
-    char **tokens = NULL;
-    char **files = NULL;
-    char *infile = NULL;
-    char *outfile = NULL;
-    char *temp = NULL;
+    // Find the redirect signs
+    for (i = 0; i < strlen(input); i++) {
+        if (!quote) {
+            if (input[i] == '<') {
+                input_idx = i;
+            }
+            else if (input[i] == '>') {
+                output_idx = i;
+            }
+            else if (input[i] == '"') {
+                quote = 1;
+            }
+        }
+        else {
+            if (input[i] == '"') {
+                quote = 0;
+            }
+        }
+    }
     
-    if (input_pos && output_pos) {
-        
-    }
-    else if (input_pos) {
-        input_idx = input_pos - input;
-        
-        temp = malloc(sizeof(char) * (strlen(input) - input_idx));
-        if (!temp) {
-            fprintf(stderr, "malloc failed: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
+    // Create the new substrings, if necessary.
+    if (input_idx != -1) {
+        if (output_idx != -1 && output_idx - input_idx > 0) {
+            temp = calloc(output_idx - input_idx - 1, sizeof(char));
+            if (!temp) {
+                fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            strncpy(temp, input + input_idx + 1, output_idx - input_idx - 1);
+            temp[output_idx - input_idx - 1] = '\0';
+            tokens[1] = temp;
         }
-        strncpy(temp, input_pos + 1, strlen(input) - input_idx - 1);
-        temp[strlen(input) - input_idx - 1] = '\0';
-        files = tokenize(temp);
-        infile = files[0];
-        free(files);
-        free(temp);
-        
-        temp = malloc(sizeof(char) * (input_pos - input + 1));
-        if (!temp) {
-            fprintf(stderr, "malloc failed: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
+        else {
+            temp = calloc(strlen(input) - input_idx - 1, sizeof(char));
+            if (!temp) {
+                fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            strncpy(temp, input + input_idx + 1, strlen(input) - input_idx - 1);
+            temp[strlen(input) - input_idx - 1] = '\0';
+            tokens[1] = temp;
         }
-        strncpy(temp, input, input_pos - input);
-        temp[input_pos - input] = '\0';
-        tokens = tokenize(temp);
-        free(temp);
-    }
-    else if (output_pos) {
-        output_idx = output_pos - input;
-        
-        temp = malloc(sizeof(char) * (strlen(input) - output_idx));
-        if (!temp) {
-            fprintf(stderr, "malloc failed: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        strncpy(temp, output_pos + 1, strlen(input) - output_idx - 1);
-        temp[strlen(input) - output_idx - 1] = '\0';
-        files = tokenize(temp);
-        outfile = files[0];
-        free(files);
-        free(temp);
-        
-        temp = malloc(sizeof(char) * (output_pos - input + 1));
-        if (!temp) {
-            fprintf(stderr, "malloc failed: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        strncpy(temp, input, output_pos - input);
-        temp[output_pos - input] = '\0';
-        tokens = tokenize(temp);
-        free(temp);
     }
     else {
-        tokens = tokenize(input);
+        tokens[1] = NULL;
     }
     
+    if (output_idx != -1) {
+        if (input_idx != -1 && input_idx - output_idx > 0) {
+            temp = calloc(input_idx - output_idx - 1, sizeof(char));
+            if (!temp) {
+                fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            strncpy(temp, input + output_idx + 1, input_idx - output_idx - 1);
+            temp[input_idx - output_idx - 1] = '\0';
+            tokens[2] = temp;
+        }
+        else {
+            temp = calloc(strlen(input) - output_idx - 1, sizeof(char));
+            if (!temp) {
+                fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            strncpy(temp, input + output_idx + 1, strlen(input) - output_idx - 1);
+            temp[strlen(input) - output_idx - 1] = '\0';
+            tokens[2] = temp;
+        }
+    }
+    else {
+        tokens[2] = NULL;
+    }
+    
+    // Get actual command
+    int lim;
+    if (input_idx != -1) {
+        if (output_idx != -1) {
+            lim = input_idx < output_idx ? input_idx : output_idx;
+        }
+        else {
+            lim = input_idx;
+        }
+    }
+    else {
+        if (output_idx != -1) {
+            lim = output_idx;
+        }
+        else {
+            lim = strlen(input);
+        }
+    }
+    
+    temp = calloc(lim + 1, sizeof(char));
+    if (!temp) {
+        fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    strncpy(temp, input, lim);
+    temp[lim] = '\0';
+    tokens[0] = temp;
+    
+    return tokens;
+}
+
+// Invokes a command, assuming it has no pipes.
+int invoke(char *input) {
+    // First, we want to determine whether we need any redirects.
+    char **files = tok_redirects(input);
     unsigned int i;
+    char *infile = NULL;
+    char *outfile = NULL;
     int status;
     
+    // Clean up the array contents.
+    char **tokens = tokenize(files[0]);
+    char **infiles;
+    if (files[1]) {
+        infiles = tokenize(files[1]);
+        infile = infiles[0];
+    }
+    char **outfiles;
+    if (files[2]) {
+        outfiles = tokenize(files[2]);
+        outfile = outfiles[0];
+    }
+
     if (strcmp(tokens[0], "cd") == 0 || strcmp(tokens[0], "chdir") == 0) {
         exec_cd(tokens);
     }
@@ -236,18 +303,30 @@ int invoke(char *input) {
     }
     
     for (i = 0; tokens[i] != NULL; i++) {
-        printf("%s\n", tokens[i]);
         free(tokens[i]);
     }
     free(tokens);
     
-    if (infile) {
-        free(infile);
+    if (files[1]) {
+        for (i = 0; infiles[i] != NULL; i++) {
+            free(infiles[i]);
+        }
+        free(infiles);
     }
     
-    if (outfile) {
-        free(outfile);
+    if (files[2]) {
+        for (i = 0; outfiles[i] != NULL; i++) {
+            free(outfiles[i]);
+        }
+        free(outfiles);
     }
+    
+    for (i = 0; i < 3; i++) {
+        if (files[i]) {
+            free(files[i]);
+        }
+    }
+    free(files);
     
     return 0;
 }
