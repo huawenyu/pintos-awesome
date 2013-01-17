@@ -5,9 +5,9 @@ all: mysh
 
 mysh: mysh.o
 
-mysh_atharv: mysh_atharv.o
+#mysh_atharv: mysh_atharv.o
 
-testbed: testbed.o
+#testbed: testbed.o
 
 clean: 
 	rm -f *.o *~ mysh
