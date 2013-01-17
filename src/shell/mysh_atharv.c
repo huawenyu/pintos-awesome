@@ -30,7 +30,7 @@ char **tokenize_pipes(char *input) {
     }
     
     int cpy_idx = 0;
-    for (i = 0; i < strlen(input); i++) {
+    for (i = 0; i < strlen(input) - 1; i++) {
         if (input[i] == '|') {
             substr = calloc(i - cpy_idx + 1, sizeof(char) * (i - cpy_idx + 1));
             strncpy(substr, input + cpy_idx, i - cpy_idx);
@@ -400,6 +400,11 @@ int pipe_invoke(char *input) {
     printf("End\n+++\n");
     
     num_cmds = i;
+    if(i == 1 && (strcmp(pipe_tokens[0], "exit") == 0 || 
+                  strcmp(pipe_tokens[0], "cd") == 0   ||
+                  strcmp(pipe_tokens[0], "chdir") == 0)) { 
+        return invoke(input);
+    }
     printf("num_cmds: %d\n", num_cmds);
     int allfiledes[num_cmds - 1][2];
     // Make file descriptor array
@@ -432,31 +437,38 @@ int pipe_invoke(char *input) {
                 printf("Changing read (%d): Process no. %d\n", allfiledes[i - 1][0], i);
                 close(allfiledes[i - 1][1]);
                 dup2(allfiledes[i - 1][0], STDIN_FILENO);
-                close(STDIN_FILENO);
+                close(allfiledes[i - 1][0]);
             }
             // If it's not the last process, change the write location
             if (i < num_cmds - 1) {
                 printf("Changing write (%d): Process no. %d\n", allfiledes[i][1], i);
                 close(allfiledes[i][0]);
                 dup2(allfiledes[i][1], STDOUT_FILENO);
-                close(STDOUT_FILENO);
+                close(allfiledes[i][1]);
             }
             printf("Invoking Process no. %d\n", i);
             invoke(pipe_tokens[i]);
-            exit(0);
+            // Should never get here cause execvp will be called
+            exit(EXIT_FAILURE);
         }
         else {
-            /**
-            for (j = 0; j < num_cmds - 1; j++) {
-                for (k = 0; k < 2; k++) {
-                    close(allfiledes[j][k]);
-                }
-            }
-            **/
+            // Parent does nothing at this step
+            continue;
         }
     }
-    // Wait for all children to finish
-    wait(&status);
+
+    // Avoid leaks
+    for (j = 0; j < num_cmds - 1; j++) {
+        for (k = 0; k < 2; k++) {
+            close(allfiledes[j][k]);
+        }
+    }
+
+    // Wait for all children to finish (only main process should ever
+    // get here)
+    for(i = 0; i < num_cmds; i++) {
+        wait(&status);
+    }
     
     return 0;
 }
