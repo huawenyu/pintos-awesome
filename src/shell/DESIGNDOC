@@ -14,7 +14,7 @@ Atharv Vaish <email@domain.com>
 
 >> Specify how many late tokens you are using on this assignment:  
 
-0
+1
 
 >> What is the Git repository and commit hash for your submission?
 
@@ -44,25 +44,14 @@ UNIX man pages?
 >> parsed by the shell process, or are child processes responsible
 >> for parsing portions of the command?
 
-The main process calls pipe_invoke, which tokenizes the input on pipes, 
-which produces an array of strings containing "a arg1 arg2 ", " b arg1 ", 
-and " c arg1 arg2 arg3". Then, that process makes N-1 pipes and forks off 
-N children (each child handling a token in the array), changing the read/write 
-file descriptors for each child appropriately. Then, for each child, 
-invoke is called, which tokenizes the input on whitespace and calls execvp.
+TODO (Atharv's code)
 
 >> A2: Now, given the command:
 >> "a arg1 arg2 < inp.txt | b arg1 | c arg1 arg2 arg3 > out.txt"
 >> Briefly explain specifically how the redirections are parsed and
 >> represented, and by what processes.
 
-Now, the array returned in the parent is {"a", "arg1", "arg2", "<", "inp.txt"}, with the
-pointer to the rest of the string: "b arg1 | c arg1 arg2 arg3 > out.txt".
-The shell process then notes that there is a "<" or a ">" in the last four
-elements, and then sets up the file descriptors to the filenames. For actually
-calling the command, the child process counts how many of the things in the array
-are for file indirection, and then copies all things in the array that aren't
-into a "real_argv" array and then terminates it in NULL.
+TODO (Atharv's code)
 
 ---- ALGORITHMS ----
 
@@ -70,10 +59,7 @@ into a "real_argv" array and then terminates it in NULL.
 >> redirection in a simple command like "a < inp.txt > out.txt", by
 >> describing what process takes care of the redirection and when.
 
-The child process, after being forked, has access to the arrays as discussed above.
-Earlier (actually in the parent), we counted how many I/O redirections were 
-in the command, so now we just read the arguments from the array that many times
-in the child right before execvp and set up the appropriate descriptors.
+TODO(Atharv's code)
 
 >> A4: Illustrate how you solved the problem of setting up the pipes
 >> between multiple operations in a single command, by describing
@@ -82,21 +68,27 @@ in the child right before execvp and set up the appropriate descriptors.
 >> the processes and their pipes, starting with your command shell's
 >> process, and going through the execution of programs a, b and c.
 >> Keep your description of each process' responsibilities limited to
->> ~25 words or less.i
+>> ~25 words or less.
 
-TODO
+The main shell process creates enough pipes for the operation (in this
+case two). Then we fork into a process that runs a and sets up its own
+write descriptor to the pipe, then we fork from the main process into
+a process that runs b and sets up its own write and read descriptors
+for the pipes, and then we fork from the main process into a process
+that runs c. 
 
 >> A5: Similarly, describe which processes are responsible for reaping
 >> other terminated processes in the example command "a | b | c".
 
-TODO
+The main shell process reaps all of these because all of them are its
+children.
 
 >> A6: Similarly, describe which processes are responsible for setting
 >> up the redirections in the example command
 >> "a < inp.txt | b | c > out.txt".
 
-TODO (probably the child process that execs a sets up the first redirection,
-and the child process that execs c sets up the last one)
+The child processes that run the individual commands set up their own
+redirection.
 
 ---- RATIONALE ----
 
@@ -144,4 +136,7 @@ lists instead of a char array to save some trouble. ~Ilya
 >> students, either for future quarters or the remaining projects?
 
 >> Any other comments?
+
+I feel like the problem in this class is going to be figuring out how to
+most effectively split up the work in a group. ~Ilya
 
