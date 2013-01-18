@@ -379,7 +379,8 @@ int invoke(char *input, int will_fork) {
                 close(in_fd);
             }
             if (outfile) {
-                int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY, 0);
+                int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY, 
+                                  S_IRUSR | S_IWUSR);
                 dup2(out_fd, STDOUT_FILENO);
                 close(out_fd);
             }
