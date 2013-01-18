@@ -16,6 +16,7 @@ char **tokenize_pipes(char *input) {
     int num_pipes = 0;
     char *substr;
     
+    // Find all the pipes, and count them.
     for (i = 0; i < strlen(input); i++) {
         if (quote) {
             if (input[i] == '"') {
@@ -32,6 +33,7 @@ char **tokenize_pipes(char *input) {
         }
     }
     
+    // Create char* array.
     char** tokens = calloc(num_pipes + 2, sizeof(char *));
     if (!tokens) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
@@ -42,6 +44,7 @@ char **tokenize_pipes(char *input) {
     int tok_start = 0;
     int count = 0;
     
+    // Split up the input based on the pipe locations.
     for (i = 0; i < strlen(input); i++) {
         if (input[i] == '|' && !quote) {
             substr = calloc(i - tok_start + 1, sizeof(char));
@@ -63,6 +66,7 @@ char **tokenize_pipes(char *input) {
         }
     }
     
+    // Handle the last token after the last pipe.
     substr = calloc(i - tok_start + 1, sizeof(char));
     if (!substr) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
@@ -86,6 +90,7 @@ char **tokenize(char *input) {
     int num_tokens = 0;
     char *substr;
     
+    // Remove whitespace and count tokens.
     for (i = 0; i < strlen(input); i++) {
         if (quote) {
             if (input[i] == '"') {
@@ -121,6 +126,7 @@ char **tokenize(char *input) {
         input[new_index] = '\0';
     }
     
+    // Create char* array.
     char** tokens = calloc(num_tokens + 1, sizeof(char *));
     if (!tokens) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
@@ -131,6 +137,7 @@ char **tokenize(char *input) {
     int tok_start = 0;
     int count = 0;
     
+    // Break apart the tokens, store in array.
     for (i = 0; i < strlen(input); i++) {
         if (input[i] == ' ' && !quote) {
             substr = calloc(i - tok_start + 1, sizeof(char));
@@ -158,6 +165,7 @@ char **tokenize(char *input) {
         }
     }
     
+    // Last token
     substr = calloc(i - tok_start + 1, sizeof(char));
     if (!substr) {
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
@@ -181,8 +189,11 @@ char **tokenize(char *input) {
 // Changes directory.
 void exec_cd(char **tokens) {
     int stat = 0;
-    
     if (tokens[1]) {
+        if (tokens[2]) {
+            fprintf(stderr, "chdir failed: only one argument accepted.\n");
+            return;
+        }
         if (strcmp(tokens[1], "~") == 0) {
             stat = chdir(getenv("HOME"));
         }
@@ -339,6 +350,7 @@ int invoke(char *input, int will_fork) {
         outfile = outfiles[0];
     }
 
+    // Handle built in commands.
     if (strcmp(tokens[0], "cd") == 0 || strcmp(tokens[0], "chdir") == 0) {
         exec_cd(tokens);
     }
@@ -346,7 +358,7 @@ int invoke(char *input, int will_fork) {
         exit(EXIT_SUCCESS);
     }
     else {
-        if (will_fork) {
+        if (will_fork) {        // Based on how invoke is called, fork.
             pid_t pid = fork();
             if (pid == -1) {
                 fprintf(stderr, "fork failed: %s\n", strerror(errno));
@@ -355,14 +367,30 @@ int invoke(char *input, int will_fork) {
             else if (pid == 0) {
                 if (infile) {
                     int in_fd = open(infile, O_RDONLY);
+                    if (in_fd == -1) {
+                        fprintf(stderr, "open failed: %s\n", strerror(errno));
+                        exit(EXIT_FAILURE);
+                    }
                     dup2(in_fd, STDIN_FILENO);
-                    close(in_fd);
+                    status = close(in_fd);
+                    if (status == -1) {
+                        fprintf(stderr, "close failed: %s\n", strerror(errno));
+                        exit(EXIT_FAILURE);
+                    }
                 }
                 if (outfile) {
                     int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY,
                                       S_IRUSR | S_IWUSR);
+                    if (out_fd == -1) {
+                        fprintf(stderr, "open failed: %s\n", strerror(errno));
+                        exit(EXIT_FAILURE);
+                    }
                     dup2(out_fd, STDOUT_FILENO);
-                    close(out_fd);
+                    status = close(out_fd);
+                    if (status == -1) {
+                        fprintf(stderr, "close failed: %s\n", strerror(errno));
+                        exit(EXIT_FAILURE);
+                    }
                 }
                 if (execvp(tokens[0], tokens) == -1) {
                     fprintf(stderr, "execvp failed: %s\n", strerror(errno));
@@ -375,14 +403,30 @@ int invoke(char *input, int will_fork) {
         else {
             if (infile) {
                 int in_fd = open(infile, O_RDONLY);
+                if (in_fd == -1) {
+                    fprintf(stderr, "open failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
                 dup2(in_fd, STDIN_FILENO);
-                close(in_fd);
+                status = close(in_fd);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
             if (outfile) {
                 int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY, 
                                   S_IRUSR | S_IWUSR);
+                if (out_fd == -1) {
+                    fprintf(stderr, "open failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
                 dup2(out_fd, STDOUT_FILENO);
-                close(out_fd);
+                status = close(out_fd);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
             if (execvp(tokens[0], tokens) == -1) {
                 fprintf(stderr, "execvp failed: %s\n", strerror(errno));
@@ -390,6 +434,7 @@ int invoke(char *input, int will_fork) {
         }
     }
     
+    // Memory management.
     for (i = 0; tokens[i] != NULL; i++) {
         free(tokens[i]);
     }
@@ -427,18 +472,20 @@ int pipe_invoke(char *input) {
     int status;
     int num_cmds = 0;
     
+    // Tokenize pipes
     pipe_tokens = tokenize_pipes(input);
     for (i = 0; pipe_tokens[i] != NULL; i++) {
         num_cmds++;
     }
     
+    // If we have no pipes, just send to invoke (no forks yet)
     if (num_cmds == 1) {
         return invoke(pipe_tokens[0], 1);
     }
     
     int allfiledes[num_cmds - 1][2];
-    // Make file descriptor array
     
+    // Make file descriptor array, and requisite pipes
     for (i = 0; i < num_cmds - 1; i++){
         pipe(filedes);
         allfiledes[i][0] = filedes[0];
@@ -458,16 +505,33 @@ int pipe_invoke(char *input) {
         else if (pid == 0) {
             // If it's not the first process, change the read location
             if (i > 0) {
-                close(allfiledes[i - 1][1]);
+                status = close(allfiledes[i - 1][1]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
                 dup2(allfiledes[i - 1][0], STDIN_FILENO);
-                close(allfiledes[i - 1][0]);
+                status = close(allfiledes[i - 1][0]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
             // If it's not the last process, change the write location
             if (i < num_cmds - 1) {
-                close(allfiledes[i][0]);
+                status = close(allfiledes[i][0]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
                 dup2(allfiledes[i][1], STDOUT_FILENO);
-                close(allfiledes[i][1]);
+                status = close(allfiledes[i][1]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
+            // invoke, but we've already forked
             invoke(pipe_tokens[i], 0);
             // Should never get here cause execvp will be called
             exit(EXIT_FAILURE);
@@ -475,15 +539,22 @@ int pipe_invoke(char *input) {
         else {
             // Close the file descriptors we've used already
             if(i > 0) {
-                close(allfiledes[i-1][1]);
-                close(allfiledes[i-1][0]);
+                status = close(allfiledes[i-1][1]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                status = close(allfiledes[i-1][0]);
+                if (status == -1) {
+                    fprintf(stderr, "close failed: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
             }
             continue;
         }
     }
 
-    // Wait for all children to finish (only main process should ever
-    // get here)
+    // Wait for all children to finish
     assert(pid != 0);
     for(i = 0; i < num_cmds; i++) {
         wait(&status);
