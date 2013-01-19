@@ -25,13 +25,13 @@ within Pintos; it is a completely stand-alone assignment.
 @section Background
 
 @menu
-* Overview::
+* Project 1 Overview::
 * Built-In Commands::
 * Input/Output Redirection::
 * Pipes::
 @end menu
 
-@node Overview
+@node Project 1 Overview
 @subsection Overview
 
 Command shells are the most basic tools that facilitate user interaction
