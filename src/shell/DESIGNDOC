@@ -8,9 +8,9 @@
 
 >> Fill in the names and email addresses of your group members.
 
-Daniel Chen <email@domain.com>
+Daniel Chen <dycheb@caltech.edu>
 Ilya Nepomnyashchiy <ilyanep@caltech.edu>
-Atharv Vaish <email@domain.com>
+Atharv Vaish <avaish@caltech.edu>
 
 >> Specify how many late tokens you are using on this assignment:  
 
@@ -19,7 +19,7 @@ Atharv Vaish <email@domain.com>
 >> What is the Git repository and commit hash for your submission?
 
    Repository URL: https://github.com/ilyanep/pintos-awesome 
-   commit ...
+   commit d55591a10792d5078a556086583df1aec8d8d499
 
 ---- PRELIMINARIES ----
 
@@ -30,7 +30,7 @@ Atharv Vaish <email@domain.com>
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
 
-UNIX man pages?
+UNIX man pages.
 
 			   COMMAND SHELL
 			   =============
@@ -44,14 +44,27 @@ UNIX man pages?
 >> parsed by the shell process, or are child processes responsible
 >> for parsing portions of the command?
 
-TODO (Atharv's code)
+The command is represented as a string, as typed in. Given a statement like 
+that, the shell passes it to a function called pipe_invoke(). This function 
+then calls tokenize_pipes() passing the string as the argument. The 
+tokenize_pipes() function splits the string apart by the pipes, and returns an
+array of each substring. The child processes are created, and each substring is
+parsed (and executed) by the child process.
 
 >> A2: Now, given the command:
 >> "a arg1 arg2 < inp.txt | b arg1 | c arg1 arg2 arg3 > out.txt"
 >> Briefly explain specifically how the redirections are parsed and
 >> represented, and by what processes.
 
-TODO (Atharv's code)
+As stated above, tokens delineated by the pipes are parsed by the child process
+that has to execute the tokens. When a child process is spawned, after the 
+requisite file descriptors are duplicated for the pipes, the invoke() function
+is called and then the tokenize_redirects() function is called, with the pipe
+token as the input. The tokenize_redirects() does a similar job as the 
+tokenize_pipes() function, in that it separates the string by '<' and '>' chars.
+However, there is assumed to be a max of one of each, if any. The return is a
+string array of size three containing the process + args, the input file if any,
+and the output file if any.
 
 ---- ALGORITHMS ----
 
@@ -59,7 +72,10 @@ TODO (Atharv's code)
 >> redirection in a simple command like "a < inp.txt > out.txt", by
 >> describing what process takes care of the redirection and when.
 
-TODO(Atharv's code)
+If an input file or an output file exists, the child process takes the values
+that are returned from tokenize_redirects(), passes them through the tokenizer()
+to clean up whitespace, and then opens, duplicates, and closes the files as 
+necessary, right before executing.
 
 >> A4: Illustrate how you solved the problem of setting up the pipes
 >> between multiple operations in a single command, by describing
@@ -95,9 +111,9 @@ redirection.
 >> A?: Why do the chdir and exit commands have to be implemented as
 >> built-in functions, rather than external programs?
 
-Because the current working directory is internal state to the command, which another
-function cannot change. Similarly, another program probably cannot kill our shell
-process.
+Because the current working directory is internal state to the command, which 
+another function cannot change. Similarly, another program probably cannot kill 
+our shell process.
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
@@ -118,25 +134,38 @@ website.
 
 String parsing is pretty much the worst thing ever. ~Ilya
 
+Agreed. Most of the time went into parsing/tokenizing, rather than thinking
+about pipes and redirects. ~Atharv
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
 
-The assignment overall gave me a good idea of how these things work, which I didn't
-actually know before. Also dealing with realloc taught me some lessons about pointers
-that were painful to learn. ~Ilya
+The assignment overall gave me a good idea of how these things work, which I 
+didn't actually know before. Also dealing with realloc taught me some lessons 
+about pointers that were painful to learn. ~Ilya
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
-Just the waitpid stuff probably. I might suggest that the parser function uses linked
-lists instead of a char array to save some trouble. ~Ilya
+Just the waitpid stuff probably. I might suggest that the parser function uses 
+linked lists instead of a char array to save some trouble. ~Ilya
+
+THE PARENT PROCESS HAS TO CLOSE THE PIPES AS WELL, even if only the children use
+them. This was basically the understanding we were missing that may have avoided
+a late token. ~Atharv
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
+
+Not sure about the TAs, but the lectures seemed a bit disconnected from this 
+project. Of course, I'm time conflicting all of them, so I'm going just by the 
+slides. ~Atharv
 
 >> Any other comments?
 
 I feel like the problem in this class is going to be figuring out how to
 most effectively split up the work in a group. ~Ilya
+
+Yes, we had issues with that but hopefully we'll get better. ~Atharv
 
