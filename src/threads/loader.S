@@ -118,8 +118,6 @@ error_dr:
     .string "\r\rCould not find bootable drive with bootable Pintos partition\r"
     jmp error
 error:
-    call puts
-    .string "\r\rBootloader error: Could not load Pintos\r"
     int $0x18
 
 
