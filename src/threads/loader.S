@@ -47,7 +47,29 @@
 ####        If you want to create helper routines, there is a TODO toward
 ####        the end of this file that shows where they should go.
 
-	call puts
+    # Iterate through all hard drives and read the MBR to see if it
+    # has a Pintos partition. Die if "drive does not exist" error 
+    # occurs.
+    mov $0x42, %ah
+    mov $0x80, %dl
+    sub $0x0F, %esp
+    movb $0x10, 15(%esp)  # Size
+    movb $0x0 , 14(%esp)  # Unused
+    movw $0x01 , 12(%esp)  # Number of sectors to read
+    movw $0xf000, 10(%esp) # Segment of buffer
+    movw $0x0000, 8(%esp)     # offset of buffer
+    movl $0x0,  4(%esp) #LBA of sector
+    movl $0x0,  %esp
+    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %esp)
+    mov %bx, %ds
+    mov %sp, %si
+    int $0x13     
+
+    # If we found a partition, start loading up to the first 512 KiB of the partition
+    # into memory location 0x20000. (TODO)
+
+
+    call puts
 	.string "\r\rTODO:  IMPLEMENT THE BOOTLOADER\r"
 
 	# Stop the processor.
