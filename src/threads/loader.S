@@ -36,7 +36,7 @@
 	call puts
 	.string "PiLo"
 
-#### TODO:  ITERATE THROUGH ALL HARD DISKS IN THE SYSTEM, LOOKING FOR A
+####        ITERATE THROUGH ALL HARD DISKS IN THE SYSTEM, LOOKING FOR A
 ####        BOOTABLE PINTOS PARTITION TO LOAD AND START.
 ####
 ####        Note that there are only ~300 bytes available for the entire
@@ -60,22 +60,24 @@
     movw $0x0000, 8(%esp)     # offset of buffer
     movl $0x0,  4(%esp) #LBA of sector
     movl $0x0,  %esp
-    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %esp)
+    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
     mov %bx, %ds
     mov %sp, %si
-    int $0x13     
+    #int $0x13     
 
     # If we found a partition, start loading up to the first 512 KiB of the partition
     # into memory location 0x20000. (TODO)
+    # Also print out a dot every some number of sectors
+    jmp error
+    jmp continue
 
-
+error:
     call puts
-	.string "\r\rTODO:  IMPLEMENT THE BOOTLOADER\r"
+    .string "\r\rBootloader error: Could not load Pintos\r"
+    int $0x18
 
-	# Stop the processor.
-	hlt
 
-#### TODO:  LOADING CODE ENDS HERE!
+#### LOADING CODE ENDS HERE!
 
 #### Transfer control to the kernel that we loaded.  We read the start
 #### address out of the ELF header (see [ELF1]) and convert it from a
@@ -87,6 +89,7 @@
 #### bytes in the loader, we reuse 4 bytes of the loader's code for
 #### this temporary pointer.
 
+continue:
 	mov $0x2000, %ax
 	mov %ax, %es
 	mov %es:0x18, %dx
@@ -152,7 +155,7 @@ popa_ret:
 	ret				# Error code still in CF
 
 
-#### TODO:  YOU CAN PUT HELPER FUNCTIONS HERE IF YOU WISH.
+####        YOU CAN PUT HELPER FUNCTIONS HERE IF YOU WISH.
 
 
 #### Command-line arguments and their count.
