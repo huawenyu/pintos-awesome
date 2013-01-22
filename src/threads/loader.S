@@ -52,18 +52,17 @@
     # occurs.
     mov $0x42, %ah
     mov $0x80, %dl
-    sub $0x0F, %esp
-    movb $0x10, 15(%esp)  # Size
-    movb $0x0 , 14(%esp)  # Unused
-    movw $0x01 , 12(%esp)  # Number of sectors to read
-    movw $0xf000, 10(%esp) # Segment of buffer
-    movw $0x0000, 8(%esp)     # offset of buffer
-    movl $0x0,  4(%esp) #LBA of sector
-    movl $0x0,  %esp
+    pushl $0x0 # LBA of sector
+    pushw $0xf000 # Segment
+    pushw $0x0 # Offset
+    pushw $0x1 # Number of sectors
+    pushw $0x0010 # Size of DAP and unused byte
     mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
     mov %bx, %ds
     mov %sp, %si
-    #int $0x13     
+    int $0x13
+
+     
 
     # If we found a partition, start loading up to the first 512 KiB of the partition
     # into memory location 0x20000. (TODO)
