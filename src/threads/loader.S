@@ -50,6 +50,7 @@
     # Iterate through all hard drives and read the MBR to see if it
     # has a Pintos partition. Die if "drive does not exist" error 
     # occurs.
+drive_loop:
     mov $0x42, %ah
     mov $0x80, %dl
     pushl $0x0 # LBA of sector
@@ -62,14 +63,60 @@
     mov %sp, %si
     int $0x13
 
-     
+    xor %ch, %ch
+    cmp %ah, %ch # See if there's a drive error (TODO: Good way?...........)
+    jne error_dr # Got to a point where there's no drive and haven't booted.
 
-    # If we found a partition, start loading up to the first 512 KiB of the partition
+    # Check that it's a boot sector
+    mov $0xAA55, %cx
+    mov $0xf000, %ax
+    mov %ax, %ds
+    mov $0x01FE, %bx
+    # If it isn't, skip to the next drive
+    cmpw %ds:(%bx), %cx
+    jne pre_drive_loop
+
+    # Check each partition to be a Pintos drive
+    xor %ebx, %ebx
+    mov $0x01BE, %bx
+part_loop:
+    # See if it's a bootable partition, if not, check next partition
+    mov $0x80, %cl
+    cmpb %cl, %ds:(%bx)
+    jne pre_part_loop
+
+    # See if it's a Pintos partition, if not, check next partition
+    mov $0x20, %cl
+    cmpb %cl, %ds:4(%ebx)
+    jne pre_drive_loop
+
+    # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000. (TODO)
     # Also print out a dot every some number of sectors
+    # Start by saving the start LBA and num sectors of this partition:
+    mov %ds:8(%ebx), %dx # LBA of starting sector
+    mov %ds:12(%ebx), %cx # Number of sectors in the partition
+
     jmp error
     jmp continue
 
+# Increment the disk counter and jump back to the drive loop
+pre_drive_loop:
+    inc %dl
+    jmp drive_loop
+
+# Increment the partition number and jump back to the partition loop
+pre_part_loop:
+    addw $0x010, %bx
+    # If we're no longer in the partition entry portion, skip to next disk
+    cmpw $0x01FE, %bx
+    jge pre_drive_loop
+    jmp part_loop
+
+error_dr:
+    call puts
+    .string "\r\rCould not find bootable drive with bootable Pintos partition\r"
+    jmp error
 error:
     call puts
     .string "\r\rBootloader error: Could not load Pintos\r"
