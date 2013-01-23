@@ -52,8 +52,8 @@
     # occurs.
     mov $0x80, %dl
 drive_loop:
-    mov $0x8000, %bx # Memory segment to read
-    mov $0x0, %cx # Memory offset to read
+    mov $0x8000, %bx # Memory segment to save to
+    mov $0x0, %cx # Memory offset to save to
     mov $0x0, %esi # The LBA to read
     call read_sector
 
@@ -81,10 +81,10 @@ part_loop:
     jne pre_drive_loop
 
     # Otherwise, we found a partition, start loading up to the first 512 KiB
-    # into memory location 0x20000. (TODO)
+    # into memory location 0x20000.
     # Print out the drive
-    call puts
-    .string "\rhd"
+    #call puts
+    #.string "\rhd"
     mov %dl, %al
     sub $0x80, %al
     add $0x61, %al
@@ -95,15 +95,62 @@ part_loop:
     inc %al
     add $0x30, %al
     call putc
-    call puts
-    .string "\r"
+    #call puts
+    #.string "\r"
 
-    # Also print out a dot every some number of sectors (TODO)
     # Start by saving the start LBA and num sectors of this partition:
-    mov %es:8(%ebx), %dx # LBA of starting sector
+    mov %es:8(%ebx), %bx # LBA of starting sector
     mov %es:12(%ebx), %cx # Number of sectors in the partition
+    # Note that %dl is currently the correct drive number
 
-    jmp continue
+    # Start off the segment and offset locations correctly
+    mov $2000, %ax
+    movw $0x0, %di
+
+    # Make sure we don't read more than 1024 sectors
+    cmp $1024, %cx
+    jl kernel_loop
+    mov $1024, %cx
+
+kernel_loop:
+    # If number of sectors left divisible by 8, print a dot
+    testw $7, %cx 
+    jne kernel_loop_3
+
+    push %ax
+    mov $0x2E, %al
+    call putc
+    pop %ax
+
+kernel_loop_3:
+    push %bx
+    push %cx
+    mov %ax, %bx # Memory segment to save to
+    push %ax
+    mov %di, %cx # Memory offset to save to
+    mov %ebx, %esi # The LBA to read
+    call read_sector
+
+    cmp $0x0, %ah # See if there's a drive error 
+    jne error_rd # Had a read error 
+    
+    pop %ax
+    pop %cx
+    pop %bx
+
+    incw %di # Increase memory offset to write to
+    jnc kernel_loop_2 
+    # Carry means increase segment, so we set %di to 0 
+    # and add $0x1000 to %ax
+    mov $0x0, %di
+    add $0x1000, %ax
+
+kernel_loop_2:
+    inc %bx # Increase LBA
+    dec %cx # One less sector left
+    cmp $0x0, %cx
+    je continue
+    jmp kernel_loop
 
 # Increment the disk counter and jump back to the drive loop
 pre_drive_loop:
@@ -118,10 +165,14 @@ pre_part_loop:
     jge pre_drive_loop
     jmp part_loop
 
+error_rd:
+    #call puts
+    #.string "\r\rRead error\r"
+    #jmp error
 error_dr:
-    call puts
-    .string "\r\rNo btbl drive or part\r"
-    jmp error
+    #call puts
+    #.string "\r\rNo btbl drive or part\r"
+    #jmp error
 error:
     int $0x18
 
@@ -210,8 +261,8 @@ popa_ret:
 # the offset in %cx, and the drive number to be in %dl
 read_sector:
     mov $0x42, %ah
-    pushl %esi # LBA of sector
     pushl $0x0 
+    pushl %esi # LBA of sector
     pushw %bx # Segment
     pushw %cx # Offset
     pushw $0x1 # Number of sectors
