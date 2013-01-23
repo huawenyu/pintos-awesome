@@ -52,18 +52,10 @@
     # occurs.
     mov $0x80, %dl
 drive_loop:
-    mov $0x42, %ah
-    pushl $0x0 # LBA of sector
-    pushl $0x0 
-    pushw $0x8000 # Segment
-    pushw $0x0 # Offset
-    pushw $0x1 # Number of sectors
-    pushw $0x10 # Size of DAP and unused byte
-    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
-    mov %bx, %ds
-    mov %sp, %si
-    int $0x13
-    add $16, %sp # Pop the DAP
+    mov $0x8000, %bx # Memory segment to read
+    mov $0x0, %cx # Memory offset to read
+    mov $0x0, %esi # The LBA to read
+    call read_sector
 
     cmp $0x0, %ah # See if there's a drive error 
     jne error_dr # Got to a point where there's no drive and haven't booted.
@@ -75,8 +67,6 @@ drive_loop:
     # If it isn't, skip to the next drive
     cmpw $0xAA55, %es:(%bx)
     jne pre_drive_loop
-    mov $0x2E, %al # Print a dot
-    call putc
 
     # Check each partition to be a Pintos drive
     xor %ebx, %ebx
@@ -105,6 +95,8 @@ part_loop:
     inc %al
     add $0x30, %al
     call putc
+    call puts
+    .string "\r"
 
     # Also print out a dot every some number of sectors (TODO)
     # Start by saving the start LBA and num sectors of this partition:
@@ -214,6 +206,22 @@ popa_ret:
 
 ####        YOU CAN PUT HELPER FUNCTIONS HERE IF YOU WISH.
 
+# Expects the LBA to be in %esi, the memory segment in %bx,
+# the offset in %cx, and the drive number to be in %dl
+read_sector:
+    mov $0x42, %ah
+    pushl %esi # LBA of sector
+    pushl $0x0 
+    pushw %bx # Segment
+    pushw %cx # Offset
+    pushw $0x1 # Number of sectors
+    pushw $0x10 # Size of DAP and unused byte
+    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
+    mov %bx, %ds
+    mov %sp, %si
+    int $0x13
+    add $16, %sp # Pop the DAP
+    ret
 
 #### Command-line arguments and their count.
 #### This is written by the `pintos' utility and read by the kernel.
