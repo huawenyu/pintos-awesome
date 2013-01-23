@@ -83,17 +83,14 @@ part_loop:
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000.
     # Print out the drive
-    #call puts
-    #.string "\rhd"
+    call puts
+    .string "\rhd"
     mov %dl, %al
-    sub $0x80, %al
-    add $0x61, %al
+    sub $0x1F, %al
     call putc
-    sub $0x01BE, %bx
     mov %bl, %al
     shr $4, %al
-    inc %al
-    add $0x30, %al
+    add $0x26, %al
     call putc
     #call puts
     #.string "\r"
