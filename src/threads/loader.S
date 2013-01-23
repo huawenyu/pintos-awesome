@@ -53,7 +53,6 @@
     mov $0x80, %edx
 drive_loop:
     mov $0x8000, %bx # Memory segment to save to
-    xor %cx, %cx # Memory offset to save to
     xor %esi, %esi # The LBA to read
     call read_sector
 
@@ -80,7 +79,7 @@ part_loop:
 
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000.
-    # Print out the drive
+    # Print out the drive info
     call puts
     .string "\rhd"
     leal -0x1F(%edx), %eax
@@ -89,51 +88,43 @@ part_loop:
     shr $4, %al
     add $0x26, %al
     call putc
-    #call puts
-    #.string "\r"
+    mov $0x0D, %al
+    call putc
 
     # Start by saving the start LBA and num sectors of this partition:
     mov %es:8(%ebx), %esi # LBA of starting sector
-    mov %es:12(%ebx), %edi # Number of sectors in the partition
+    mov %es:12(%ebx), %ecx # Number of sectors in the partition
     # Note that %dl is currently the correct drive number
 
     # Start off the segment and offset locations correctly
-    movw $2000, %bx # Segment
-    xor %cx, %cx # Offset
+    movw $3000, %bx # Segment
 
-    # Make sure we don't read more than 1024 sectors
-    cmp $1024, %edi
+    # Make sure we don't read more than 1024 sectors (512 KiB)
+    cmp $1024, %ecx
     jl kernel_loop
-    mov $1024, %edi
+    mov $1024, %ecx
 
 kernel_loop:
     # If number of sectors left divisible by 16, print a dot
-    testw $15, %di
-    je kernel_loop_3
+    #testw $15, %cx
+    #jnz kernel_loop_3
 
     mov $0x2E, %al
     call putc
 
 kernel_loop_3:
-    push %esi
+    pushl %esi
     call read_sector
 
     cmp $0x0, %ah # See if there's a drive error 
     jne error_rd # Had a read error 
     
-    pop %esi
+    popl %esi
 
-    incw %cx # Increase memory offset to write to
-    jnc kernel_loop_2 
-    # Carry means increase segment, so we set %cx to 0 
-    # and add $0x1000 to %bx
-    xor %cx, %cx
-    add $0x1000, %bx
-
-kernel_loop_2:
+    add $0x20, %bx # Increase segment
     inc %esi # Increase LBA
-    dec %edi # One fewer sector left
-    cmp $0x0, %edi
+    dec %ecx # One fewer sector left
+    cmp $0x0, %ecx
     je continue
     jmp kernel_loop
 
@@ -151,16 +142,16 @@ pre_part_loop:
     jmp part_loop
 
 error_rd:
-    #call puts
-    #.string "\r\rRead error\r"
-    #jmp error
+    call puts
+    .string " e02 "
+    jmp error
 error_dr:
     #call puts
-    #.string "\r\rNo btbl drive or part\r"
-    #jmp error
+    #.string " e01 "
 error:
     int $0x18
 continue:
+    
 
 #### LOADING CODE ENDS HERE!
 
@@ -242,21 +233,21 @@ popa_ret:
 ####        YOU CAN PUT HELPER FUNCTIONS HERE IF YOU WISH.
 
 # Expects the LBA to be in %esi, the memory segment in %bx,
-# the offset in %cx, and the drive number to be in %dl
+# the offset is 0, and the drive number to be in %dl
 # This function will clobber %ax and %si
 read_sector:
     mov $0x42, %ah
     pushl $0x0 
     pushl %esi # LBA of sector
     pushw %bx # Segment
-    pushw %cx # Offset
+    pushw $0x0 # Offset
     pushw $0x1 # Number of sectors
     pushw $0x10 # Size of DAP and unused byte
     mov %ss, %si # Make sure %ds:%si points to the stack (which is at %ss: %sp)
     mov %si, %ds
     mov %sp, %si
     int $0x13
-    add $16, %sp # Pop the DAP
+    add $16, %esp # Pop the DAP
     ret
 
 #### Command-line arguments and their count.
