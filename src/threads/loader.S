@@ -50,10 +50,13 @@
     # Iterate through all hard drives and read the MBR to see if it
     # has a Pintos partition. Die if "drive does not exist" error 
     # occurs.
-drive_loop:
-    mov $0x42, %ah
     mov $0x80, %dl
+drive_loop:
+    mov $0x2E, %al # Print a dot
+    call putc
+    mov $0x42, %ah
     pushl $0x0 # LBA of sector
+    pushl $0x0 
     pushw $0xf000 # Segment
     pushw $0x0 # Offset
     pushw $0x1 # Number of sectors
@@ -62,6 +65,7 @@ drive_loop:
     mov %bx, %ds
     mov %sp, %si
     int $0x13
+    add $16, %sp # Pop the DAP
 
     cmp $0x0, %ah # See if there's a drive error (TODO: Good way?...........)
     jne error_dr # Got to a point where there's no drive and haven't booted.
@@ -89,18 +93,18 @@ part_loop:
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000. (TODO)
     # Print out the drive
-    call puts
-    .string '\r\r Found bootable disk hd'
-    mov %dl, %al
-    sub $0x80, %al
-    add $0x61, %al
-    call putc
-    sub $0x01BE, %bx
-    mov %bl, %al
-    shr $4, %al
-    inc %al
-    add $0x30, %al
-    call putc
+#    call puts
+#    .string "\r\r Found bootable disk hd"
+#    mov %dl, %al
+#    sub $0x80, %al
+#    add $0x61, %al
+#    call putc
+#    sub $0x01BE, %bx
+#    mov %bl, %al
+#    shr $4, %al
+#    inc %al
+#    add $0x30, %al
+#    call putc
 
     # Also print out a dot every some number of sectors (TODO)
     # Start by saving the start LBA and num sectors of this partition:
