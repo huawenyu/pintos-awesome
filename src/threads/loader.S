@@ -69,8 +69,7 @@ drive_loop:
     jne pre_drive_loop
 
     # Check each partition to be a Pintos drive
-    xor %ebx, %ebx
-    mov $0x01BE, %bx
+    mov $0x01BE, %ebx
 part_loop:
     # See if it's a bootable partition, if not, check next partition
     cmpb $0x80, %es:(%bx)
@@ -78,7 +77,7 @@ part_loop:
 
     # See if it's a Pintos partition, if not, check next partition
     cmpb $0x20, %es:4(%ebx)
-    jne pre_drive_loop
+    jne pre_part_loop
 
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000.
