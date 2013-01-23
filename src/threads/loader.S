@@ -97,7 +97,7 @@ part_loop:
     # Note that %dl is currently the correct drive number
 
     # Start off the segment and offset locations correctly
-    movw $3000, %bx # Segment
+    movw $0x2000, %bx # Segment
 
     # Make sure we don't read more than 1024 sectors (512 KiB)
     cmp $1024, %ecx
@@ -106,8 +106,8 @@ part_loop:
 
 kernel_loop:
     # If number of sectors left divisible by 16, print a dot
-    #testw $15, %cx
-    #jnz kernel_loop_3
+    testw $15, %cx
+    jnz kernel_loop_3
 
     mov $0x2E, %al
     call putc
@@ -124,8 +124,7 @@ kernel_loop_3:
     add $0x20, %bx # Increase segment
     inc %esi # Increase LBA
     dec %ecx # One fewer sector left
-    cmp $0x0, %ecx
-    je continue
+    jz continue
     jmp kernel_loop
 
 # Increment the disk counter and jump back to the drive loop
@@ -143,11 +142,11 @@ pre_part_loop:
 
 error_rd:
     call puts
-    .string " e02 "
+    .string " e2"
     jmp error
 error_dr:
-    #call puts
-    #.string " e01 "
+    call puts
+    .string " e1"
 error:
     int $0x18
 continue:
@@ -243,8 +242,8 @@ read_sector:
     pushw $0x0 # Offset
     pushw $0x1 # Number of sectors
     pushw $0x10 # Size of DAP and unused byte
-    mov %ss, %si # Make sure %ds:%si points to the stack (which is at %ss: %sp)
-    mov %si, %ds
+    #mov %ss, %si # Make sure %ds:%si points to the stack(which is at %ss: %sp)
+    #mov %si, %ds
     mov %sp, %si
     int $0x13
     add $16, %esp # Pop the DAP
