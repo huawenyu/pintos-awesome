@@ -52,8 +52,6 @@
     # occurs.
     mov $0x80, %dl
 drive_loop:
-    mov $0x2E, %al # Print a dot
-    call putc
     mov $0x42, %ah
     pushl $0x0 # LBA of sector
     pushl $0x0 
@@ -67,7 +65,7 @@ drive_loop:
     int $0x13
     add $16, %sp # Pop the DAP
 
-    cmp $0x0, %ah # See if there's a drive error (TODO: Good way?...........)
+    cmp $0x0, %ah # See if there's a drive error 
     jne error_dr # Got to a point where there's no drive and haven't booted.
 
     # Check that it's a boot sector
@@ -77,6 +75,8 @@ drive_loop:
     # If it isn't, skip to the next drive
     cmpw $0xAA55, %es:(%bx)
     jne pre_drive_loop
+    mov $0x2E, %al # Print a dot
+    call putc
 
     # Check each partition to be a Pintos drive
     xor %ebx, %ebx
@@ -93,18 +93,18 @@ part_loop:
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000. (TODO)
     # Print out the drive
-#    call puts
-#    .string "\r\r Found bootable disk hd"
-#    mov %dl, %al
-#    sub $0x80, %al
-#    add $0x61, %al
-#    call putc
-#    sub $0x01BE, %bx
-#    mov %bl, %al
-#    shr $4, %al
-#    inc %al
-#    add $0x30, %al
-#    call putc
+    call puts
+    .string "\rhd"
+    mov %dl, %al
+    sub $0x80, %al
+    add $0x61, %al
+    call putc
+    sub $0x01BE, %bx
+    mov %bl, %al
+    shr $4, %al
+    inc %al
+    add $0x30, %al
+    call putc
 
     # Also print out a dot every some number of sectors (TODO)
     # Start by saving the start LBA and num sectors of this partition:
@@ -128,7 +128,7 @@ pre_part_loop:
 
 error_dr:
     call puts
-    .string "\r\rCould not find bootable drive with bootable Pintos partition\r"
+    .string "\r\rNo btbl drive or part\r"
     jmp error
 error:
     int $0x18
