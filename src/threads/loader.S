@@ -50,7 +50,7 @@
     # Iterate through all hard drives and read the MBR to see if it
     # has a Pintos partition. Die if "drive does not exist" error 
     # occurs.
-    mov $0x80, %dl
+    mov $0x80, %edx
 drive_loop:
     mov $0x8000, %bx # Memory segment to save to
     xor %cx, %cx # Memory offset to save to
@@ -61,8 +61,7 @@ drive_loop:
     jne error_dr # Got to a point where there's no drive and haven't booted.
 
     # Check that it's a boot sector
-    mov $0x8000, %ax
-    mov %ax, %es
+    mov %bx, %es # $0x8000 -> %es
     mov $0x01FE, %bx
     # If it isn't, skip to the next drive
     cmpw $0xAA55, %es:(%bx)
@@ -84,8 +83,7 @@ part_loop:
     # Print out the drive
     call puts
     .string "\rhd"
-    mov %dl, %al
-    sub $0x1F, %al
+    leal -0x1F(%edx), %eax
     call putc
     mov %bl, %al
     shr $4, %al
@@ -100,8 +98,8 @@ part_loop:
     # Note that %dl is currently the correct drive number
 
     # Start off the segment and offset locations correctly
-    mov $2000, %bx
-    movw $0x0, %cx
+    movw $2000, %bx # Segment
+    xor %cx, %cx # Offset
 
     # Make sure we don't read more than 1024 sectors
     cmp $1024, %edi
@@ -111,12 +109,10 @@ part_loop:
 kernel_loop:
     # If number of sectors left divisible by 16, print a dot
     testw $15, %di
-    jne kernel_loop_3
+    je kernel_loop_3
 
-    push %eax
     mov $0x2E, %al
     call putc
-    pop %eax
 
 kernel_loop_3:
     push %esi
@@ -136,7 +132,7 @@ kernel_loop_3:
 
 kernel_loop_2:
     inc %esi # Increase LBA
-    dec %edi # One less sector left
+    dec %edi # One fewer sector left
     cmp $0x0, %edi
     je continue
     jmp kernel_loop
@@ -165,7 +161,6 @@ error_dr:
 error:
     int $0x18
 continue:
-
 
 #### LOADING CODE ENDS HERE!
 
@@ -248,6 +243,7 @@ popa_ret:
 
 # Expects the LBA to be in %esi, the memory segment in %bx,
 # the offset in %cx, and the drive number to be in %dl
+# This function will clobber %ax and %si
 read_sector:
     mov $0x42, %ah
     pushl $0x0 
@@ -256,8 +252,8 @@ read_sector:
     pushw %cx # Offset
     pushw $0x1 # Number of sectors
     pushw $0x10 # Size of DAP and unused byte
-    mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
-    mov %bx, %ds
+    mov %ss, %si # Make sure %ds:%si points to the stack (which is at %ss: %sp)
+    mov %si, %ds
     mov %sp, %si
     int $0x13
     add $16, %sp # Pop the DAP
