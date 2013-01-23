@@ -57,23 +57,21 @@ drive_loop:
     pushw $0xf000 # Segment
     pushw $0x0 # Offset
     pushw $0x1 # Number of sectors
-    pushw $0x0010 # Size of DAP and unused byte
+    pushw $0x10 # Size of DAP and unused byte
     mov %ss, %bx # Make sure %ds:%si points to the stack (which is at %ss: %sp)
     mov %bx, %ds
     mov %sp, %si
     int $0x13
 
-    xor %ch, %ch
-    cmp %ah, %ch # See if there's a drive error (TODO: Good way?...........)
+    cmp $0x0, %ah # See if there's a drive error (TODO: Good way?...........)
     jne error_dr # Got to a point where there's no drive and haven't booted.
 
     # Check that it's a boot sector
-    mov $0xAA55, %cx
     mov $0xf000, %ax
-    mov %ax, %ds
+    mov %ax, %es
     mov $0x01FE, %bx
     # If it isn't, skip to the next drive
-    cmpw %ds:(%bx), %cx
+    cmpw $0xAA55, %es:(%bx)
     jne pre_drive_loop
 
     # Check each partition to be a Pintos drive
@@ -81,23 +79,34 @@ drive_loop:
     mov $0x01BE, %bx
 part_loop:
     # See if it's a bootable partition, if not, check next partition
-    mov $0x80, %cl
-    cmpb %cl, %ds:(%bx)
+    cmpb $0x80, %es:(%bx)
     jne pre_part_loop
 
     # See if it's a Pintos partition, if not, check next partition
-    mov $0x20, %cl
-    cmpb %cl, %ds:4(%ebx)
+    cmpb $0x20, %es:4(%ebx)
     jne pre_drive_loop
 
     # Otherwise, we found a partition, start loading up to the first 512 KiB
     # into memory location 0x20000. (TODO)
-    # Also print out a dot every some number of sectors
-    # Start by saving the start LBA and num sectors of this partition:
-    mov %ds:8(%ebx), %dx # LBA of starting sector
-    mov %ds:12(%ebx), %cx # Number of sectors in the partition
+    # Print out the drive
+    call puts
+    .string '\r\r Found bootable disk hd'
+    mov %dl, %al
+    sub $0x80, %al
+    add $0x61, %al
+    call putc
+    sub $0x01BE, %bx
+    mov %bl, %al
+    shr $4, %al
+    inc %al
+    add $0x30, %al
+    call putc
 
-    jmp error
+    # Also print out a dot every some number of sectors (TODO)
+    # Start by saving the start LBA and num sectors of this partition:
+    mov %es:8(%ebx), %dx # LBA of starting sector
+    mov %es:12(%ebx), %cx # Number of sectors in the partition
+
     jmp continue
 
 # Increment the disk counter and jump back to the drive loop
