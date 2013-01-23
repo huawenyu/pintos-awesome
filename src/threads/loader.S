@@ -53,8 +53,8 @@
     mov $0x80, %dl
 drive_loop:
     mov $0x8000, %bx # Memory segment to save to
-    mov $0x0, %cx # Memory offset to save to
-    mov $0x0, %esi # The LBA to read
+    xor %cx, %cx # Memory offset to save to
+    xor %esi, %esi # The LBA to read
     call read_sector
 
     cmp $0x0, %ah # See if there's a drive error 
@@ -95,56 +95,49 @@ part_loop:
     #.string "\r"
 
     # Start by saving the start LBA and num sectors of this partition:
-    mov %es:8(%ebx), %bx # LBA of starting sector
-    mov %es:12(%ebx), %cx # Number of sectors in the partition
+    mov %es:8(%ebx), %esi # LBA of starting sector
+    mov %es:12(%ebx), %edi # Number of sectors in the partition
     # Note that %dl is currently the correct drive number
 
     # Start off the segment and offset locations correctly
-    mov $2000, %ax
-    movw $0x0, %di
+    mov $2000, %bx
+    movw $0x0, %cx
 
     # Make sure we don't read more than 1024 sectors
-    cmp $1024, %cx
+    cmp $1024, %edi
     jl kernel_loop
-    mov $1024, %cx
+    mov $1024, %edi
 
 kernel_loop:
-    # If number of sectors left divisible by 8, print a dot
-    testw $7, %cx 
+    # If number of sectors left divisible by 16, print a dot
+    testw $15, %di
     jne kernel_loop_3
 
-    push %ax
+    push %eax
     mov $0x2E, %al
     call putc
-    pop %ax
+    pop %eax
 
 kernel_loop_3:
-    push %bx
-    push %cx
-    mov %ax, %bx # Memory segment to save to
-    push %ax
-    mov %di, %cx # Memory offset to save to
-    mov %ebx, %esi # The LBA to read
+    push %esi
     call read_sector
 
     cmp $0x0, %ah # See if there's a drive error 
     jne error_rd # Had a read error 
     
-    pop %ax
-    pop %cx
-    pop %bx
+    pop %esi
 
-    incw %di # Increase memory offset to write to
+    incw %cx # Increase memory offset to write to
     jnc kernel_loop_2 
-    # Carry means increase segment, so we set %di to 0 
-    # and add $0x1000 to %ax
-    mov $0x0, %di
-    add $0x1000, %ax
+    # Carry means increase segment, so we set %cx to 0 
+    # and add $0x1000 to %bx
+    xor %cx, %cx
+    add $0x1000, %bx
 
 kernel_loop_2:
-    inc %bx # Increase LBA
-    dec %cx # One less sector left
-    cmp $0x0, %cx
+    inc %esi # Increase LBA
+    dec %edi # One less sector left
+    cmp $0x0, %edi
     je continue
     jmp kernel_loop
 
@@ -171,6 +164,7 @@ error_dr:
     #jmp error
 error:
     int $0x18
+continue:
 
 
 #### LOADING CODE ENDS HERE!
@@ -185,7 +179,6 @@ error:
 #### bytes in the loader, we reuse 4 bytes of the loader's code for
 #### this temporary pointer.
 
-continue:
 	mov $0x2000, %ax
 	mov %ax, %es
 	mov %es:0x18, %dx
