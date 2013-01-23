@@ -55,7 +55,7 @@ drive_loop:
     mov $0x42, %ah
     pushl $0x0 # LBA of sector
     pushl $0x0 
-    pushw $0xf000 # Segment
+    pushw $0x8000 # Segment
     pushw $0x0 # Offset
     pushw $0x1 # Number of sectors
     pushw $0x10 # Size of DAP and unused byte
@@ -69,7 +69,7 @@ drive_loop:
     jne error_dr # Got to a point where there's no drive and haven't booted.
 
     # Check that it's a boot sector
-    mov $0xf000, %ax
+    mov $0x8000, %ax
     mov %ax, %es
     mov $0x01FE, %bx
     # If it isn't, skip to the next drive
