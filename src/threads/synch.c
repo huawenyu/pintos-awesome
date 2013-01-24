@@ -37,6 +37,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* Helper functions */
+static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
+
 /*! Initializes semaphore SEMA to VALUE.  A semaphore is a
     nonnegative integer along with two atomic operators for
     manipulating it:
@@ -68,7 +71,9 @@ void sema_down(struct semaphore *sema) {
 
     old_level = intr_disable();
     while (sema->value == 0) {
-        list_push_back(&sema->waiters, &thread_current()->elem);
+        /* Insert into the waiting list based on priority. 
+         * Basically, the waiting list is now a priority queue. */
+        list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_less_func, NULL);
         thread_block();
     }
     sema->value--;
@@ -110,6 +115,9 @@ void sema_up(struct semaphore *sema) {
 
     old_level = intr_disable();
     if (!list_empty(&sema->waiters)) {
+        /* Note that I changed sema_down to insert in order by
+         * priority, so this will pop the highest priority 
+         * waiting process. */
         thread_unblock(list_entry(list_pop_front(&sema->waiters),
                                   struct thread, elem));
     }
@@ -319,5 +327,15 @@ void cond_broadcast(struct condition *cond, struct lock *lock) {
 
     while (!list_empty(&cond->waiters))
         cond_signal(cond, lock);
+}
+
+/* Helper function passed as a parameter to list functions that
+ * tell it how to compare two elements of the list. */
+static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux) {
+  struct thread *lthread, *rthread;
+  ASSERT (l != NULL && r != NULL);
+  lthread = list_entry(l, struct thread, elem);
+  rthread = list_entry(r, struct thread, elem);
+  return (lthread->priority > rthread->priority);
 }
 
