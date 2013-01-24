@@ -399,11 +399,18 @@ void
 thread_set_priority_main(struct thread *other, int new_priority, bool donated)
 {
   struct thread *next;
-  other->priority = new_priority;
-  /* If it hasn't received a donation yet, set both the original
-   * priority and the current priority. */
-  if (donated == false)
-    other->original_priority = new_priority;
+  if (donated == true) {
+    other->priority = new_priority;
+  }
+  else {
+    if (other->priority == other->original_priority) {
+      other->priority = new_priority;
+      other->original_priority = new_priority;
+    }
+    else {
+      other->original_priority = new_priority;
+    }
+  }
 
   /* If the current thread no longer has the highest priority, yield.
    * The ready list is ordered in descending order, so the thread with
