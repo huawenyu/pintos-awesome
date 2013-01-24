@@ -384,15 +384,26 @@ thread_wake (int64_t ticks)
 void
 thread_set_priority (int new_priority) 
 {
-    other_thread_set_priority(thread_current(), new_priority);
+    thread_set_priority_main(thread_current(), new_priority, false);
 }
 
 /* Sets an arbitrary thread's priority to NEW_PRIORITY. */
 void
 other_thread_set_priority(struct thread *other, int new_priority)
 {
+    thread_set_priority_main(other, new_priority, false);
+}
+
+/* Sets an arbitrary thread's priority to NEW_PRIORITY. */
+void
+thread_set_priority_main(struct thread *other, int new_priority, bool donated)
+{
   struct thread *next;
   other->priority = new_priority;
+  /* If it hasn't received a donation yet, set both the original
+   * priority and the current priority. */
+  if (donated == false)
+    other->original_priority = new_priority;
 
   /* If the current thread no longer has the highest priority, yield.
    * The ready list is ordered in descending order, so the thread with
@@ -400,6 +411,9 @@ other_thread_set_priority(struct thread *other, int new_priority)
   next = list_entry(list_begin(&ready_list), struct thread, elem);
   if (other == thread_current() && next->priority > new_priority) {
     thread_yield();
+  }
+  else if (other->status == THREAD_READY) {
+    list_sort(&ready_list, thread_less_func, NULL);
   }
 }
 

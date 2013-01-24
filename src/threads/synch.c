@@ -40,6 +40,7 @@
 /* Helper functions */
 static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
 static bool lock_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
+static bool sema_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
 
 /*! Initializes semaphore SEMA to VALUE.  A semaphore is a
     nonnegative integer along with two atomic operators for
@@ -111,18 +112,31 @@ bool sema_try_down(struct semaphore *sema) {
     This function may be called from an interrupt handler. */
 void sema_up(struct semaphore *sema) {
     enum intr_level old_level;
+    struct thread *other = NULL;
 
     ASSERT(sema != NULL);
 
+
+    /* Trying something */
+    //list_sort(&sema->waiters, thread_less_func, NULL);
+
     old_level = intr_disable();
     if (!list_empty(&sema->waiters)) {
+
+        list_sort(&sema->waiters, thread_less_func, NULL);
         /* Note that I changed sema_down to insert in order by
          * priority, so this will pop the highest priority 
          * waiting process. */
-        thread_unblock(list_entry(list_pop_front(&sema->waiters),
-                                  struct thread, elem));
+        other = list_entry(list_pop_front(&sema->waiters),
+                           struct thread, elem);
+        thread_unblock(other);
     }
     sema->value++;
+
+    /* Check if the current thread needs to yield. */
+    if (other != NULL && other->priority > thread_current()->priority) {
+        thread_yield();
+    }
     intr_set_level(old_level);
 }
 
@@ -211,8 +225,10 @@ void lock_acquire(struct lock *lock) {
      * priority donation. */
     while (lock_holder != NULL && curr->priority > lock_holder->priority) {
         /* Donate priority */
-        other_thread_set_priority(lock_holder, curr->priority);
-        curr_lock->priority = curr->priority;
+        thread_set_priority_main(lock_holder, curr->priority, true);
+        if (curr->priority > curr_lock->priority) {
+            curr_lock->priority = curr->priority;
+        }
         /* Go to the thread's lock's holder if it exists.
          * Otherwise, we break out of the loop. */
         if (lock_holder->desired_lock != NULL) {
@@ -287,14 +303,15 @@ void lock_release(struct lock *lock) {
     /* If the thread holds no more locks, then restore original
      * priority (before donation). */
     if (list_empty(&(curr->locks))) {
-        thread_set_priority(curr->original_priority);
+        thread_set_priority_main(curr, curr->original_priority, true);
     }
     /* Otherwise, the thread's priority becomes the priority of
        the highest priority lock. */
     else {
+        list_sort(&(curr->locks), lock_less_func, NULL);
         next = list_front(&(curr->locks));
         next_lock = list_entry(next, struct lock, lockelem);
-        thread_set_priority(next_lock->priority);
+        thread_set_priority_main(curr, next_lock->priority, true);
     }
 
     /* Testing something... */
@@ -364,9 +381,12 @@ void cond_wait(struct condition *cond, struct lock *lock) {
     ASSERT(lock != NULL);
     ASSERT(!intr_context());
     ASSERT(lock_held_by_current_thread(lock));
-  
+ 
     sema_init(&waiter.semaphore, 0);
-    list_push_back(&cond->waiters, &waiter.elem);
+    /* Assign a priority to the semaphore and insert it into the list
+     * in order of priority. */
+    waiter.semaphore.priority = thread_current()->priority;
+    list_insert_ordered(&(cond->waiters), &(waiter.elem), sema_less_func, NULL);
     lock_release(lock);
     sema_down(&waiter.semaphore);
     lock_acquire(lock);
@@ -411,7 +431,7 @@ static bool thread_less_func(const struct list_elem *l, const struct list_elem *
   ASSERT (l != NULL && r != NULL);
   lthread = list_entry(l, struct thread, elem);
   rthread = list_entry(r, struct thread, elem);
-  return (lthread->priority > rthread->priority);
+  return (lthread->priority >= rthread->priority);
 }
 
 /* Helper function passed as a parameter to list functions that
@@ -422,5 +442,15 @@ static bool lock_less_func(const struct list_elem *l, const struct list_elem *r,
   llock = list_entry(l, struct lock, lockelem);
   rlock = list_entry(r, struct lock, lockelem);
   return (llock->priority > rlock->priority);
+}
+
+/* Helper function passed as a parameter to list functions that
+ * tell it how to compare two elements of a semaphore_elem list. */
+static bool sema_less_func(const struct list_elem *l, const struct list_elem *r, void *aux) {
+  struct semaphore_elem *lsema, *rsema;
+  ASSERT (l != NULL && r != NULL);
+  lsema = list_entry(l, struct semaphore_elem, elem);
+  rsema = list_entry(r, struct semaphore_elem, elem);
+  return (lsema->semaphore.priority > rsema->semaphore.priority);
 }
 
