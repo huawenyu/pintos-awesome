@@ -105,6 +105,7 @@ struct thread {
     /**@{*/
     struct list_elem elem;              /*!< List element. */
     struct list locks;                  /*!< List of locks the thread holds. */
+    struct lock *desired_lock;          /*!< The lock the thread is waiting on. */
     /**@}*/
 
 #ifdef USERPROG

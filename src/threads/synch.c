@@ -195,18 +195,34 @@ void lock_acquire(struct lock *lock) {
 
     struct thread *lock_holder = lock->holder;
     struct thread *curr = thread_current();
+    struct lock *curr_lock = lock;
     //struct list *lock_list;
     //struct list_elem *e;
 
-    /* Simple priority donation */
-    if (lock_holder != NULL && curr->priority > lock_holder->priority) {
-        other_thread_set_priority(lock_holder, curr->priority);
-        lock->priority = curr->priority;
-        //list_insert_ordered(&(lock_holder->locks), &curr, thread_less_func, NULL);
-    }
+    /* This thread is now waiting on lock. */
+    curr->desired_lock = lock;
+
     /* Set lock priority when a thread first wants to acquire the lock. */
     if (lock_holder == NULL)
-        lock->priority = curr->priority;
+        curr_lock->priority = curr->priority;
+    /* Starting with the thread holding the lock the current 
+     * thread wants to access, loop through threads holding the
+     * lock the previous thread is waiting on and perform a
+     * priority donation. */
+    while (lock_holder != NULL && curr->priority > lock_holder->priority) {
+        /* Donate priority */
+        other_thread_set_priority(lock_holder, curr->priority);
+        curr_lock->priority = curr->priority;
+        /* Go to the thread's lock's holder if it exists.
+         * Otherwise, we break out of the loop. */
+        if (lock_holder->desired_lock != NULL) {
+            curr_lock = lock_holder->desired_lock;
+            lock_holder = curr_lock->holder;
+        }
+        else {
+            break;
+        }
+    }
 
     /* Testing something... */
     //lock_list = &(&lock->semaphore)->waiters;
@@ -219,6 +235,9 @@ void lock_acquire(struct lock *lock) {
 
     sema_down(&lock->semaphore);
     lock->holder = thread_current();
+
+    /* Once the thread acquires the lock, it's no longer waiting on it. */
+    lock->holder->desired_lock = NULL;
 
     /* Once the thread acquires the lock, insert it into its locks list. */
     list_insert_ordered(&(lock->holder->locks), &(lock->lockelem), lock_less_func, NULL);
