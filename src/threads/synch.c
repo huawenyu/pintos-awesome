@@ -183,6 +183,14 @@ void lock_acquire(struct lock *lock) {
     ASSERT(!intr_context());
     ASSERT(!lock_held_by_current_thread(lock));
 
+    struct thread *lock_holder = lock->holder;
+    struct thread *curr = thread_current();
+
+    /* Simple priority donation */
+    if (lock_holder != NULL && curr->priority > lock_holder->priority) {
+        other_thread_set_priority(lock_holder, curr->priority);
+    }
+
     sema_down(&lock->semaphore);
     lock->holder = thread_current();
 }
@@ -217,6 +225,9 @@ void lock_release(struct lock *lock) {
 
     lock->holder = NULL;
     sema_up(&lock->semaphore);
+
+    /* Restore original priority (before donation) */
+    thread_set_priority(thread_current()->original_priority);
 }
 
 /*! Returns true if the current thread holds LOCK, false
