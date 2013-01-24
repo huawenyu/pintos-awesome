@@ -76,6 +76,8 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 /* Helper functions */
+void other_thread_set_priority(struct thread *other, int priority);
+void thread_set_priority_main(struct thread *other, int priority, bool donated);
 static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
 
 /* Initializes the threading system by transforming the code
@@ -222,7 +224,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /* Yield immediately if the newly created thread has a higher priority. */
+  /* Yield immediately if the newly created thread has a higher
+   * priority. */
   if (priority > thread_current()->priority) {
     thread_yield();
   }
@@ -333,8 +336,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, thread_less_func, NULL);
+  if (cur != idle_thread)
+    /* The ready list should be ordered by priority. */
+    list_insert_ordered(&ready_list, &cur->elem, thread_less_func, 
+                        NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -380,14 +385,16 @@ thread_wake (int64_t ticks)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* Sets the current thread's priority to NEW_PRIORITY when a donation
+   was not performed. */
 void
 thread_set_priority (int new_priority) 
 {
     thread_set_priority_main(thread_current(), new_priority, false);
 }
 
-/* Sets an arbitrary thread's priority to NEW_PRIORITY. */
+/* Sets an arbitrary thread's priority to NEW_PRIORITY when a donation
+   was not performed. */
 void
 other_thread_set_priority(struct thread *other, int new_priority)
 {
@@ -396,17 +403,27 @@ other_thread_set_priority(struct thread *other, int new_priority)
 
 /* Sets an arbitrary thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority_main(struct thread *other, int new_priority, bool donated)
+thread_set_priority_main(struct thread *other, int new_priority, 
+                         bool donated)
 {
   struct thread *next;
+
+  /* If there was a donation, the current priority should change, but
+   * the original priority should stay the same. */
   if (donated == true) {
     other->priority = new_priority;
   }
   else {
+    /* If there wasn't a donation and the thread hasn't received a 
+     * donation yet, both the current and the original priorites should
+     * change. */
     if (other->priority == other->original_priority) {
       other->priority = new_priority;
       other->original_priority = new_priority;
     }
+    /* If there wasn't a donation but the thread has received a 
+     * donation (it has a higher priority than the original priority),
+     * only the original priority should change. */
     else {
       other->original_priority = new_priority;
     }
@@ -419,6 +436,9 @@ thread_set_priority_main(struct thread *other, int new_priority, bool donated)
   if (other == thread_current() && next->priority > new_priority) {
     thread_yield();
   }
+  /* If we're setting the priority for a thread that's not the current 
+   * thread and it's in the ready list, we need to make sure the ready 
+   * list is still in order. */
   else if (other->status == THREAD_READY) {
     list_sort(&ready_list, thread_less_func, NULL);
   }

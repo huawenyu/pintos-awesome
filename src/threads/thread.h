@@ -155,9 +155,6 @@ void thread_wake(int64_t ticks);
 
 int thread_get_priority(void);
 void thread_set_priority(int);
-void other_thread_set_priority(struct thread *other, int priority);
-void thread_set_priority_main(struct thread *other, int priority, bool donated);
-
 int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
