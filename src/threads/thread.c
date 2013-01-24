@@ -75,6 +75,9 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* Helper functions */
+static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -219,6 +222,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* Yield immediately if the newly created thread has a higher priority. */
+  if (priority > thread_current()->priority) {
+    thread_yield();
+  }
+
   return tid;
 }
 
@@ -255,7 +263,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, thread_less_func, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -326,7 +334,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, thread_less_func, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -376,7 +384,17 @@ thread_wake (int64_t ticks)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *next;
+  struct thread *curr = thread_current();
+  curr->priority = new_priority;
+
+  /* If the current thread no longer has the highest priority, yield.
+   * The ready list is ordered in descending order, so the thread with
+   * the highest priority will be at the beginning of the list. */
+  next = list_entry(list_begin(&ready_list), struct thread, elem);
+  if (next->priority > new_priority) {
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -624,3 +642,14 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* Helper function passed as a parameter to list functions that
+ * tell it how to compare two elements of the list. */
+static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux) {
+  struct thread *lthread, *rthread;
+  ASSERT (l != NULL && r != NULL);
+  lthread = list_entry(l, struct thread, elem);
+  rthread = list_entry(r, struct thread, elem);
+  return (lthread->priority > rthread->priority);
+}
+
