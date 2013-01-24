@@ -19,7 +19,8 @@ Atharv Vaish <avaish@caltech.edu>
 >> What is the Git repository and commit hash for your submission?
 
    Repository URL: https://github.com/ilyanep/pintos-awesome 
-   commit ...
+   commit (how does a doc that I commit contain the correct commit hash?)
+          (everything but the doc is in commit dda9a1a8f9) 
 
 ---- PRELIMINARIES ----
 
@@ -42,21 +43,71 @@ Atharv Vaish <avaish@caltech.edu>
 >> anything like that; simply state the general purpose of the various
 >> memory areas used by your bootload code.
 
+First, the bootloader loads the disks' MBRs to $0x8000:$0x0000 (kind of
+an arbitrarily chosen address that won't interfere with anything else).
+This is clearly of size 512B, since it loads one sector there.
+
+Then, it directly loads the kernel code into $0x2000:$0x0000 of size
+however big the kernel is (and not into $2000:$0x0000). Hurr.
+
 ---- ALGORITHMS ----
 
 >> A2: Write a pseudocode description (e.g. at the level of Python and
 >> English phrases) of the sequence of operations that your bootloader
 >> performs when searching for, and then loading, the Pintos kernel.
 
+disk_num = 80;
+while true:
+    check if disk_num is boot disk (bytes 510 and 511 are 55 AA)
+    if error: print error and int 18
+    
+    part_loc = $0x01BE;
+    while true:
+        if partition described at part_loc is not bootable (has $0x80):
+            break
+        if partition at part_loc is not pintos (4 bytes in has $0x20):
+            break
+        goto kernel_part
+    part_loc = part_loc + $0x0010
+    if part_loc >= $0x01FE
+        break
+disk_num = disk_num + 1;
+
+kernel_part:
+    lba = the stuff at 8 bytes into part_loc
+    num_left = the stuff at 12 bytes into part_loc
+    cur_segment = $0x2000 (not $2000)
+
+    if num_left > 1024:
+        num_left = 1024;
+
+    while num_left > 0:
+        read sector into cur_segment
+        segment = segment + $0x20
+
 >> A3: Did you have any difficulties making the entire bootloader fit
 >> within the space allotted?  If so, what steps did you take to reduce
 >> the size of your bootstrap code?
+
+*Tons* of difficulties.
+
+1. Heavily optimizing what commands I use (for example when printing out the
+hard drive and partition, I had a sub 0x80 (because %dl starts at $0x80)
+and then an add $0x61 (the ascii value of 'a'), but then turned that into
+one command and even managed to use lea to do it all in one command.
+2. Heavily shortening strings, or even using putc with $0x0D to print a
+newline in one place.
+3. Being pretty sad and trying random things until something worked.
 
 ---- RATIONALE ----
 
 >> A4: Why did you choose your final implementation?  Did you encounter
 >> any major obstacles or difficulties that forced you to change your
 >> approach?  If so, describe the obstacles and how you overcame them.
+
+Honestly, I wrote out some comments that indicated the pseduocode program
+flow, and then wrote code to implement it (this is how I often write code). 
+No real major changes to the flow were made at any point.
 
 			   SURVEY QUESTIONS
 			   ================
@@ -70,12 +121,24 @@ website.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+It was annoying rather than hard in my opinion. ~Ilya
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+I now understand how bootloaders work, which is cool. ~Ilya
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+
+A good hint would be to give some sample code about how the DAP might work.
+Figuring out how to get that positioned on the stack or in memory was annoying
+and not illustrative in any particular sense except that it taught me 
+I need to learn the little endian stuff better. 
+
+Also, holy crap, figuring out how to use gdb with this would be really
+useful. ~Ilya
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
