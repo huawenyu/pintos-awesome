@@ -102,15 +102,16 @@ struct thread {
     int nice;                           /*!< Thread niceness for mlfq. */
     int recent_cpu;                     /*!< Thread recent_cpu in 17.14
                                              fixed point arithmetic */
-    struct list_elem allelem;           /*!< List element for all threads 
-                                             list. */
-    struct list_elem sleep_elem;        /*!< List element for sleeping threads 
-                                             list. */
+    int original_priority;              /*!< Priority before donation. */
+    struct list_elem allelem;           /*!< List element for all threads list. */
+    struct list_elem sleep_elem;        /*!< List element for sleeping threads list. */
     /**@}*/
 
     /*! Shared between thread.c and synch.c. */
     /**@{*/
     struct list_elem elem;              /*!< List element. */
+    struct list locks;                  /*!< List of locks the thread holds. */
+    struct lock *desired_lock;          /*!< The lock the thread is waiting on. */
     /**@}*/
 
 #ifdef USERPROG
@@ -165,7 +166,6 @@ void thread_wake(int64_t ticks);
 
 int thread_get_priority(void);
 void thread_set_priority(int);
-
 int thread_get_nice(void);
 void thread_yield_if_not_highest(void);
 void thread_set_nice(int);
