@@ -39,6 +39,7 @@
 
 /* Helper functions */
 static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
+static bool lock_less_func(const struct list_elem *l, const struct list_elem *r, void *aux);
 
 /*! Initializes semaphore SEMA to VALUE.  A semaphore is a
     nonnegative integer along with two atomic operators for
@@ -176,6 +177,7 @@ void lock_init(struct lock *lock) {
 
     lock->holder = NULL;
     sema_init(&lock->semaphore, 1);
+    lock->priority = PRI_MIN;
 }
 
 /*! Acquires LOCK, sleeping until it becomes available if
@@ -193,14 +195,34 @@ void lock_acquire(struct lock *lock) {
 
     struct thread *lock_holder = lock->holder;
     struct thread *curr = thread_current();
+    //struct list *lock_list;
+    //struct list_elem *e;
 
     /* Simple priority donation */
     if (lock_holder != NULL && curr->priority > lock_holder->priority) {
         other_thread_set_priority(lock_holder, curr->priority);
+        lock->priority = curr->priority;
+        //list_insert_ordered(&(lock_holder->locks), &curr, thread_less_func, NULL);
     }
+    /* Set lock priority when a thread first wants to acquire the lock. */
+    if (lock_holder == NULL)
+        lock->priority = curr->priority;
+
+    /* Testing something... */
+    //lock_list = &(&lock->semaphore)->waiters;
+    //for (e = list_begin(lock_list); e != list_end(lock_list); e = list_next(e)) {
+    //    struct thread *other = list_entry(e, struct thread, allelem);
+    //    if (curr->priority > other->priority) {
+    //        other_thread_set_priority(other, curr->priority);
+    //    }
+    //}
 
     sema_down(&lock->semaphore);
     lock->holder = thread_current();
+
+    /* Once the thread acquires the lock, insert it into its locks list. */
+    list_insert_ordered(&(lock->holder->locks), &(lock->lockelem), lock_less_func, NULL);
+    //lock->priority = lock->holder->priority;
 }
 
 /*! Tries to acquires LOCK and returns true if successful or false
@@ -228,14 +250,48 @@ bool lock_try_acquire(struct lock *lock) {
     make sense to try to release a lock within an interrupt
     handler. */
 void lock_release(struct lock *lock) {
+    //struct list *lock_list, *donating_list;
+    //struct list_elem *e, *o;
+    struct list_elem *next;
+    struct lock *next_lock;
+
     ASSERT(lock != NULL);
     ASSERT(lock_held_by_current_thread(lock));
+
+    struct thread *curr = thread_current();
 
     lock->holder = NULL;
     sema_up(&lock->semaphore);
 
-    /* Restore original priority (before donation) */
-    thread_set_priority(thread_current()->original_priority);
+    /* Remove the lock from the thread's locks list. */
+    list_remove(&(lock->lockelem));
+    /* If the thread holds no more locks, then restore original
+     * priority (before donation). */
+    if (list_empty(&(curr->locks))) {
+        thread_set_priority(curr->original_priority);
+    }
+    /* Otherwise, the thread's priority becomes the priority of
+       the highest priority lock. */
+    else {
+        next = list_front(&(curr->locks));
+        next_lock = list_entry(next, struct lock, lockelem);
+        thread_set_priority(next_lock->priority);
+    }
+
+    /* Testing something... */
+    //lock_list = &(&lock->semaphore)->waiters;
+    /* Loop through all threads waiting on the resource */
+    //for (e = list_begin(lock_list); e != list_end(lock_list); e = list_next(e)) {
+    //    struct thread *other = list_entry(e, struct thread, allelem);
+    //    donating_list = other->locks;
+    //    /* Loop through that thread's donating threads list */
+    //    for (o = list_begin(donating_list); o != list_end(donating_list); o = list_next(o)) {
+    //        struct thread *donating_thread = list_entry(o, struct thread, allelem);
+    //        if (donating_thread == thread_current()) {
+    //            
+    //        }
+    //    }
+    //}
 }
 
 /*! Returns true if the current thread holds LOCK, false
@@ -330,12 +386,22 @@ void cond_broadcast(struct condition *cond, struct lock *lock) {
 }
 
 /* Helper function passed as a parameter to list functions that
- * tell it how to compare two elements of the list. */
+ * tell it how to compare two elements of a thread list. */
 static bool thread_less_func(const struct list_elem *l, const struct list_elem *r, void *aux) {
   struct thread *lthread, *rthread;
   ASSERT (l != NULL && r != NULL);
   lthread = list_entry(l, struct thread, elem);
   rthread = list_entry(r, struct thread, elem);
   return (lthread->priority > rthread->priority);
+}
+
+/* Helper function passed as a parameter to list functions that
+ * tell it how to compare two elements of a lock list. */
+static bool lock_less_func(const struct list_elem *l, const struct list_elem *r, void *aux) {
+  struct lock *llock, *rlock;
+  ASSERT (l != NULL && r != NULL);
+  llock = list_entry(l, struct lock, lockelem);
+  rlock = list_entry(r, struct lock, lockelem);
+  return (llock->priority > rlock->priority);
 }
 
