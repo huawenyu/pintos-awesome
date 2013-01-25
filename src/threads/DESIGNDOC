@@ -14,7 +14,10 @@ Atharv Vaish <avaish@caltech.edu>
 
 >> Specify how many late tokens you are using on this assignment: 
 
-0 (hopefully)
+1, but I'm requesting an extension from Dean Green because I've 
+been sick with my chronic illness for the past week. It's worth 
+noting that by team members' parts of the assignments were done on 
+time.
 
 >> What is the Git repository and commit hash for your submission?
 
@@ -104,31 +107,135 @@ makes it take longer inside the timer interrupt handler.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+For the thread struct:
+    
+    int original_priority;              /*!< Priority before donation. */
+    struct list locks;                  /*!< List of locks the thread holds. */
+    struct lock *desired_lock;          /*!< The lock the thread is waiting on. */
+
+original_priority is so the thread knows its priority before donation 
+    so it can revert back to it after the donating threads finish.
+locks is so the thread knows what threads have donated their priorities
+    to it, which is used to keep track of multiple donations to a single
+    thread.
+desired_lock is so the thread keeps track of the resource it's blocked
+    on. This forms a linked list with the holder member of semaphores
+    to keep track of nested donations.
+===
+For the lock struct:
+    
+    struct list_elem lockelem;  /*!< List element for the holding thread's locks list. */
+    int priority;               /*!< Current priority of the lock. */
+
+lockelem is just there so the lock can be put in a thread's locks list.
+priority is the priority of the thread holding the lock. This is used to keep 
+    track of multiple donations.
+===
+For the semaphore struct:
+
+    int priority;               /*!< Priority of semaphore (used in condvar). */
+
+priority is the priority of the semaphore. This is used to order the 
+    semaphores in a conditional variable.
+
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+I use a linked list to track priority donation. The head of the list 
+is the thread requesting the original lock, and the tail of the list 
+is the last thread in the donation chain. Thus, if we have threads 
+1,2,...,N, with priority(thread i) = i for all i, and each thread j 
+holds a lock j' that the j+1th thread is trying to access, we get the 
+following linked list:
+
+THREAD N -(waiting on)-> LOCK N-1 -(held by)-> THREAD N-1 -(waiting on) ->
+...
+THREAD 2 -(waiting on)-> LOCK 1 -(held by) -> THREAD 1
+
+Thus, the priority donation chain would start with the currently running 
+thread, in this case, thread N with priority N, trying to acquire lock N-1. 
+
+THREAD N (priority = N) -(LOCK)-> THREAD N-1 (priority = N-1) ...
+
+It would donate its priority to thread N-1, making thread N-1's priority N.
+
+THREAD N (priority = N) -(LOCK) -> THREAD N-1 (priority = N) ...
+
+This continues for all consecutive pairs of threads i and i-1 until the 
+priority of thread i-1 is greater than the priority of thread N or we reach 
+a thread that isn't waiting on any locks.
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
+Whenever I insert into the waiting list for the desired resource, I insert 
+based on the thread's priority, thus turning the waiting list into a priority 
+queue. Thus, the highest priority thread will always be at the front of the 
+queue. Then, whenever the resource is available, it pops off the thread at 
+the front, which will always be the highest priority thread. To ensure this, 
+I had to make sure to re-sort the list every time a thread's priority changes 
+because that could potentially un-order the list. An alternative method would 
+be to re-sort the thread before you want to retreive the desired thread.
 
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
+When a thread wants to acquire a lock and calls lock_acquire(), it first 
+sets desired_lock to that lock, meaning it's waiting on that lock. So, 
+curr points to lock through its desired_lock member, and lock points to 
+its holder through its holder member. Then, a priority donation chain starts.
+As described in B2, as long as a next thread in the donation chain exists 
+and the current thread's priority is greater than the next thread's priority, 
+the next thread's priority is set to the current thread's, and the priority 
+of the lock that the current thread wants and the next thread holds is 
+updated. Then, curr_lock is updated to be the next lock and lock_holder is
+updated to be the holder of the next lock. Then, the semaphore is downed 
+and the thread waits until the lock is available. When it finally acquires 
+the lock, it no longer is waiting for the lock, so its desired_lock member 
+is set to NULL. We also have to make sure to keep track of that lock in the 
+thread's locks list (list of the locks that thread currently holds).
 
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+When a thread releases a lock, it sets lock->holder to NULL because that 
+lock is no longer being held by that thread. The semaphore is upped, and 
+the next thread is chosen. Then, the thread has to remove that lock from 
+its list of locks it currently holds and check if it needs to reset its 
+priority. If its locks list is empty, it holds no resources, so no threads 
+are donating priorities to it, so its priority is reset to its original 
+priority. If the locks list isn't empty, there could still possibly be 
+donating threads, so we set its priority to the priority of the highest 
+priority donating thread.
 
 ---- SYNCHRONIZATION ----
 
 >> B6: Describe a potential race in thread_set_priority() and explain
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
+A race condition could occur if you are interrupted by another thread 
+setting your priority while you are trying to set your priority. For 
+example, if thread B has just set thread A's priority but thread A tries 
+to reset its own priority before thread B is done re-ordering the ready 
+list, the ready list will possibly end up out of order because the list 
+will be sorted with an unexpected value for the priority of B. I "avoid" 
+this by re-ordering the thread list before doing anything with it. The 
+easy way to avoid this would be to disable interrupts before calling 
+thread_set_priority() and re-enable them afterwards. I can use a lock 
+to avoid this race by forcing threads to acquire a lock to the thread 
+priority before setting it and only relinquishing it after all of the 
+priority setting is complete.
 
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+I chose this design because it seemed simple and straightfoward, and it 
+worked. Also, I didn't consider any other designs that seemed feasible. 
+At first, to implement multiple donations, I tried keeping a list of 
+threads instead of a list of locks. The list of threads would contain 
+all of the threads donating a priority to that thread. I forgot why I 
+gave up on that method, but I think it's because I couldn't get the code 
+to compile when I tried to put the list into the thread struct.
 
 			  ADVANCED SCHEDULER
 			  ==================
