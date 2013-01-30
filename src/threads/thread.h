@@ -97,6 +97,7 @@ struct thread {
     uint8_t *stack;                     /*!< Saved stack pointer. */
     int priority;                       /*!< Priority. */
     struct list_elem allelem;           /*!< List element for all threads list. */
+    struct list_elem sleep_elem;        /*!< List element for sleeping threads list. */
     /**@}*/
 
     /*! Shared between thread.c and synch.c. */
@@ -113,6 +114,7 @@ struct thread {
 
     /*! Owned by thread.c. */
     /**@{*/
+    int64_t sleep_end;                  /*!< For sleeping thread, time of sleep end. */
     unsigned magic;                     /* Detects stack overflow. */
     /**@}*/
 };
@@ -125,7 +127,8 @@ extern bool thread_mlfqs;
 void thread_init(void);
 void thread_start(void);
 
-void thread_tick(void);
+void thread_sleep(int64_t finish);
+void thread_tick(int64_t cur_ticks);
 void thread_print_stats(void);
 
 typedef void thread_func(void *aux);
@@ -145,6 +148,7 @@ void thread_yield(void);
 typedef void thread_action_func(struct thread *t, void *aux);
 
 void thread_foreach(thread_action_func *, void *);
+void thread_wake(int64_t ticks);
 
 int thread_get_priority(void);
 void thread_set_priority(int);

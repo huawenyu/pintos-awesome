@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of processes that are waiting on a timer tick before
+   they wake up next */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,12 +96,14 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->sleep_end = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -117,10 +123,20 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
+void
+thread_sleep (int64_t end) 
+{
+    struct thread *t = thread_current(); 
+    ASSERT (!intr_context ());
+
+    t->sleep_end = end;
+    list_push_back(&sleep_list, &t->sleep_elem);
+}
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (int64_t cur_ticks) 
 {
   struct thread *t = thread_current ();
 
@@ -133,6 +149,8 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  thread_wake(cur_ticks);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -331,6 +349,29 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* Wakes all sleeping threads whose sleep_end is less than current
+   ticks. Must be called with interrupts off. */
+void
+thread_wake (int64_t ticks)
+{
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  e = list_begin(&sleep_list);
+  while (e != list_end (&sleep_list))
+    {
+      struct thread *t = list_entry (e, struct thread, sleep_elem);
+      ASSERT(is_thread(t));
+      e = list_next(e);
+        if(t->sleep_end <= ticks) {
+            t->sleep_end = 0;
+            list_remove(&t->sleep_elem);
+            thread_unblock(t);
+        } 
+    }
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
@@ -463,6 +504,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->sleep_end = 0;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
