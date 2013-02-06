@@ -489,6 +489,31 @@ thread_get_priority (void)
   }
 }
 
+/* Yields if the current thread isn't the highest priority */
+void
+thread_yield_if_not_highest () {
+
+  ASSERT(intr_get_level() == INTR_OFF);
+  struct thread *t = thread_current();
+  ASSERT(is_thread(t));
+
+  // Find highest priority and see if we need to yield.
+  struct list_elem *e;
+
+  for (e = list_begin(&ready_list); e != list_end(&ready_list);
+       e = list_next(e)) 
+  {
+    struct thread *cur = list_entry(e, struct thread, elem);
+
+    ASSERT(is_thread(cur));
+
+    if(cur->mlfq_priority > t->mlfq_priority) {
+      thread_yield();
+    }
+  }
+
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice) 
@@ -509,20 +534,10 @@ thread_set_nice (int nice)
   if(t->mlfq_priority > PRI_MAX) { t->mlfq_priority = PRI_MAX; }
   if(t->mlfq_priority < PRI_MIN) { t->mlfq_priority = PRI_MIN; }
 
-  // Find highest priority and see if we need to yield.
-  struct list_elem *e;
-
-  for (e = list_begin(&ready_list); e != list_end(&ready_list);
-       e = list_next(e)) 
-  {
-    struct thread *cur = list_entry(e, struct thread, elem);
-
-    if(cur->mlfq_priority > t->mlfq_priority) {
-      thread_yield();
-    }
-  }
+  thread_yield_if_not_highest();
 
   intr_set_level(old_level);
+
 }
 
 /* Returns the current thread's nice value. */
