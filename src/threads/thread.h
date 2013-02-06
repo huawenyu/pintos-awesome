@@ -99,7 +99,9 @@ struct thread {
     int mlfq_priority;                  /*!< Priority for mlfq -- separated
                                              variable to avoid possible
                                              conflicts. */
-    int nice                            /*!< Thread niceness for mlfq. */
+    int nice;                           /*!< Thread niceness for mlfq. */
+    int recent_cpu;                     /*!< Thread recent_cpu in 17.14
+                                             fixed point arithmetic */
     struct list_elem allelem;           /*!< List element for all threads 
                                              list. */
     struct list_elem sleep_elem;        /*!< List element for sleeping threads 
@@ -135,6 +137,9 @@ void thread_init(void);
 void thread_start(void);
 
 void thread_sleep(int64_t finish);
+void update_load_avg(void);
+void update_recent_cpu(void);
+void update_mlfq_priority(void);
 void thread_tick(int64_t cur_ticks);
 void thread_print_stats(void);
 

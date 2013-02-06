@@ -1,4 +1,5 @@
 #include "threads/thread.h"
+#include "devices/timer.h"
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
@@ -19,6 +20,10 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+
+int f = 1 << 14; // For fixed point arithmetic
+// System load average in 17.14 fixed point number representation.
+static int load_avg;
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -92,6 +97,7 @@ void
 thread_init (void) 
 {
   ASSERT (intr_get_level () == INTR_OFF);
+  load_avg = 0;
 
   lock_init (&tid_lock);
   list_init (&ready_list);
@@ -133,12 +139,78 @@ thread_sleep (int64_t end)
     list_push_back(&sleep_list, &t->sleep_elem);
 }
 
+void update_mlfq_priority() {
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+
+      int fpa_pri = (PRI_MAX * f) - (t->recent_cpu / 4) - (t->nice * f * 2);
+      t->mlfq_priority = fpa_pri / f;
+      if(t->mlfq_priority > PRI_MAX) { t->mlfq_priority = PRI_MAX; }
+      if(t->mlfq_priority < PRI_MIN) { t->mlfq_priority = PRI_MIN; }
+    }
+}
+
+void update_recent_cpu() {
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+
+      int coeff = 2*load_avg;
+      int den = 2*load_avg + (1*f);
+      coeff = ((int64_t) coeff) * f / den;
+      t->recent_cpu = (((int64_t) coeff) * t->recent_cpu / f) + t->nice;
+    }
+}
+
+void update_load_avg() {
+  int num_rdy_threads = list_size(&ready_list);
+  num_rdy_threads = num_rdy_threads * f; // Convert to fpa
+  num_rdy_threads = num_rdy_threads / 60; // For the load average
+
+  // Calculate coefficient on load_avg
+  int coeff = 59 * f;
+  coeff = coeff / 60;
+  // Multiply the coefficient
+  int temp = ((int64_t) load_avg) * coeff / f;
+
+  // Now add the two values together
+  load_avg = temp + num_rdy_threads;
+}
+
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (int64_t cur_ticks) 
 {
   struct thread *t = thread_current ();
+
+  if(thread_mlfqs) {
+    // Update system-wide load average and recent cpu counts, if necessary
+    if(cur_ticks % TIMER_FREQ == 0) {
+      update_load_avg();
+      update_recent_cpu();
+    } else {
+      t->recent_cpu = t->recent_cpu + (1 * f);      
+    }
+
+    // Set thread priorities on every thread
+    if(cur_ticks % 4 == 0) {
+      update_mlfq_priority();
+    }
+
+  }
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -396,7 +468,10 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice) 
 {
-  thread_current ()->nice = nice;
+  int correct_nice = nice;
+  if(correct_nice > 20) { correct_nice = 20; }
+  if(correct_nice < -20) { correct_nice = -20; } 
+  thread_current ()->nice = correct_nice;
 }
 
 /* Returns the current thread's nice value. */
@@ -410,8 +485,7 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return ((load_avg * 100) + f / 2) / f;  
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -421,7 +495,6 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
