@@ -99,6 +99,7 @@ struct thread {
     int mlfq_priority;                  /*!< Priority for mlfq -- separated
                                              variable to avoid possible
                                              conflicts. */
+    int nice                            /*!< Thread niceness for mlfq. */
     struct list_elem allelem;           /*!< List element for all threads 
                                              list. */
     struct list_elem sleep_elem;        /*!< List element for sleeping threads 
