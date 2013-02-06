@@ -96,8 +96,13 @@ struct thread {
     char name[16];                      /*!< Name (for debugging purposes). */
     uint8_t *stack;                     /*!< Saved stack pointer. */
     int priority;                       /*!< Priority. */
-    struct list_elem allelem;           /*!< List element for all threads list. */
-    struct list_elem sleep_elem;        /*!< List element for sleeping threads list. */
+    int mlfq_priority;                  /*!< Priority for mlfq -- separated
+                                             variable to avoid possible
+                                             conflicts. */
+    struct list_elem allelem;           /*!< List element for all threads 
+                                             list. */
+    struct list_elem sleep_elem;        /*!< List element for sleeping threads 
+                                             list. */
     /**@}*/
 
     /*! Shared between thread.c and synch.c. */
@@ -114,7 +119,8 @@ struct thread {
 
     /*! Owned by thread.c. */
     /**@{*/
-    int64_t sleep_end;                  /*!< For sleeping thread, time of sleep end. */
+    int64_t sleep_end;                  /*!< For sleeping thread, time of 
+                                             sleep end. */
     unsigned magic;                     /* Detects stack overflow. */
     /**@}*/
 };
