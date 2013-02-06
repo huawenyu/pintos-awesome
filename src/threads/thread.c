@@ -25,6 +25,8 @@ int f = 1 << 14; // For fixed point arithmetic
 // System load average in 17.14 fixed point number representation.
 static int load_avg;
 
+static bool thread_inited = false;
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -110,6 +112,8 @@ thread_init (void)
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
   initial_thread->sleep_end = 0;
+
+  thread_inited = true;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -175,6 +179,8 @@ void update_recent_cpu() {
 
 void update_load_avg() {
   int num_rdy_threads = list_size(&ready_list);
+  if(thread_current() != idle_thread) { num_rdy_threads = num_rdy_threads + 1; }
+
   num_rdy_threads = num_rdy_threads * f; // Convert to fpa
   num_rdy_threads = num_rdy_threads / 60; // For the load average
 
@@ -183,6 +189,8 @@ void update_load_avg() {
   coeff = coeff / 60;
   // Multiply the coefficient
   int temp = ((int64_t) load_avg) * coeff / f;
+
+  printf("nrt %d la %d\n", num_rdy_threads * 60 / f, load_avg / f);
 
   // Now add the two values together
   load_avg = temp + num_rdy_threads;
@@ -196,7 +204,7 @@ thread_tick (int64_t cur_ticks)
 {
   struct thread *t = thread_current ();
 
-  if(thread_mlfqs) {
+  if(thread_mlfqs && thread_inited) {
     // Update system-wide load average and recent cpu counts, if necessary
     if(cur_ticks % TIMER_FREQ == 0) {
       update_load_avg();
@@ -222,7 +230,9 @@ thread_tick (int64_t cur_ticks)
   else
     kernel_ticks++;
 
-  thread_wake(cur_ticks);
+  if(thread_inited) {
+    thread_wake(cur_ticks);
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -617,10 +627,37 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  // NOTE FROM ILYA: This will almost certainly merge conflict, but
+  // I think my version should work for your part too, so you might
+  // want to consider keeping this version.
+
+  if (list_empty (&ready_list)) {
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
+
+  int highest_pri = PRI_MIN - 1;
+  struct thread *max;
+  struct list_elem *max_elem;
+  struct list_elem *e;
+
+  for( e = list_begin(&ready_list); e != list_end(&ready_list);
+       e = list_next(e)) 
+  {
+    struct thread *t = list_entry(e, struct thread, elem);
+
+    // Strictly greater than to enforce round robin on equal priorities.
+    if(thread_mlfqs && t->mlfq_priority > highest_pri) {
+      max = t;
+      max_elem = e;
+    }
+    else if(t->priority > highest_pri) {
+      max = t;
+      max_elem = e;
+    }
+  }
+
+  list_remove(max_elem);
+  return max;
 }
 
 /* Completes a thread switch by activating the new thread's page
