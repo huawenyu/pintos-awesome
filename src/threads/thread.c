@@ -157,7 +157,21 @@ void update_mlfq_priority() {
       t->mlfq_priority = fpa_pri / f;
       if(t->mlfq_priority > PRI_MAX) { t->mlfq_priority = PRI_MAX; }
       if(t->mlfq_priority < PRI_MIN) { t->mlfq_priority = PRI_MIN; }
+
+      //printf("\n%d %d\n", t->tid, t->mlfq_priority);
     }
+}
+
+void update_mlfq_priority_cur() {
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  struct thread *t = thread_current(); 
+
+  int fpa_pri = (PRI_MAX * f) - (t->recent_cpu / 4) - (t->nice * f * 2);
+  t->mlfq_priority = fpa_pri / f;
+  if(t->mlfq_priority > PRI_MAX) { t->mlfq_priority = PRI_MAX; }
+  if(t->mlfq_priority < PRI_MIN) { t->mlfq_priority = PRI_MIN; }
 }
 
 void update_recent_cpu() {
@@ -208,13 +222,15 @@ thread_tick (int64_t cur_ticks)
     if(cur_ticks % TIMER_FREQ == 0) {
       update_load_avg();
       update_recent_cpu();
+      update_mlfq_priority();
+
     } else {
       t->recent_cpu = t->recent_cpu + (1 * f);      
     }
 
     // Set thread priorities on every thread
     if(cur_ticks % 4 == 0) {
-      update_mlfq_priority();
+      update_mlfq_priority_cur();
     }
 
   }
@@ -520,7 +536,11 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  return ((load_avg * 100) + f / 2) / f;  
+  enum intr_level old_level;
+  old_level = intr_disable();
+  int ret_value =  ((load_avg * 100) + f / 2) / f;  
+  intr_set_level(old_level);
+  return ret_value;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -528,7 +548,11 @@ int
 thread_get_recent_cpu (void) 
 {
   struct thread *t = thread_current();
-  return ((t->recent_cpu * 100) + f /2) / f;
+  enum intr_level old_level;
+  old_level = intr_disable();
+  int ret_value = ((t->recent_cpu * 100) + f /2) / f;
+  intr_set_level(old_level);
+  return ret_value;
 }
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -674,10 +698,12 @@ next_thread_to_run (void)
     if(thread_mlfqs && t->mlfq_priority > highest_pri) {
       max = t;
       max_elem = e;
+      highest_pri = t->mlfq_priority;
     }
     else if(t->priority > highest_pri) {
       max = t;
       max_elem = e;
+      highest_pri = t->priority;
     }
   }
 

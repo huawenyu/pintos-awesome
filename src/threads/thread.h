@@ -140,6 +140,7 @@ void thread_sleep(int64_t finish);
 void update_load_avg(void);
 void update_recent_cpu(void);
 void update_mlfq_priority(void);
+void update_mlfq_priority_cur(void);
 void thread_tick(int64_t cur_ticks);
 void thread_print_stats(void);
 
