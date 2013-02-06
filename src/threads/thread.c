@@ -173,7 +173,7 @@ void update_recent_cpu() {
       int coeff = 2*load_avg;
       int den = 2*load_avg + (1*f);
       coeff = ((int64_t) coeff) * f / den;
-      t->recent_cpu = (((int64_t) coeff) * t->recent_cpu / f) + t->nice;
+      t->recent_cpu = (((int64_t) coeff) * t->recent_cpu / f) + (t->nice * f);
     }
 }
 
@@ -181,6 +181,7 @@ void update_load_avg() {
   int num_rdy_threads = list_size(&ready_list);
   if(thread_current() != idle_thread) { num_rdy_threads = num_rdy_threads + 1; }
 
+  //printf("\nnrt %d la %d tt %d\n", num_rdy_threads, thread_get_load_avg(), timer_ticks());
   num_rdy_threads = num_rdy_threads * f; // Convert to fpa
   num_rdy_threads = num_rdy_threads / 60; // For the load average
 
@@ -189,8 +190,6 @@ void update_load_avg() {
   coeff = coeff / 60;
   // Multiply the coefficient
   int temp = ((int64_t) load_avg) * coeff / f;
-
-  printf("nrt %d la %d\n", num_rdy_threads * 60 / f, load_avg / f);
 
   // Now add the two values together
   load_avg = temp + num_rdy_threads;
@@ -478,10 +477,36 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice) 
 {
+  struct thread *t = thread_current();
+
+  enum intr_level old_level = intr_disable();
+
   int correct_nice = nice;
   if(correct_nice > 20) { correct_nice = 20; }
   if(correct_nice < -20) { correct_nice = -20; } 
-  thread_current ()->nice = correct_nice;
+  t->nice = correct_nice;
+
+  // Recalculate priority
+
+  int fpa_pri = (PRI_MAX * f) - (t->recent_cpu / 4) - (t->nice * f * 2);
+  t->mlfq_priority = fpa_pri / f;
+  if(t->mlfq_priority > PRI_MAX) { t->mlfq_priority = PRI_MAX; }
+  if(t->mlfq_priority < PRI_MIN) { t->mlfq_priority = PRI_MIN; }
+
+  // Find highest priority and see if we need to yield.
+  struct list_elem *e;
+
+  for (e = list_begin(&ready_list); e != list_end(&ready_list);
+       e = list_next(e)) 
+  {
+    struct thread *cur = list_entry(e, struct thread, elem);
+
+    if(cur->mlfq_priority > t->mlfq_priority) {
+      thread_yield();
+    }
+  }
+
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's nice value. */
@@ -502,8 +527,8 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  struct thread *t = thread_current();
+  return ((t->recent_cpu * 100) + f /2) / f;
 }
 /* Idle thread.  Executes when no other thread is ready to run.
 
