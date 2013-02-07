@@ -323,7 +323,7 @@ thread_create (const char *name, int priority,
 
   /* Yield immediately if the newly created thread has a higher
    * priority. */
-  if (priority > thread_current()->priority) {
+  if (!thread_mlfqs && priority > thread_current()->priority) {
     thread_yield();
   }
 
@@ -505,6 +505,8 @@ void
 thread_set_priority_main(struct thread *other, int new_priority, 
                          bool donated)
 {
+  if(thread_mlfqs) { return; }
+
   struct thread *next;
 
   /* If there was a donation, the current priority should change, but
@@ -532,7 +534,7 @@ thread_set_priority_main(struct thread *other, int new_priority,
    * The ready list is ordered in descending order, so the thread with
    * the highest priority will be at the beginning of the list. */
   next = list_entry(list_begin(&ready_list), struct thread, elem);
-  if (other == thread_current() && next->priority > new_priority) {
+  if (!thread_mlfqs && other == thread_current() && next->priority > new_priority) {
     thread_yield();
   }
   /* If we're setting the priority for a thread that's not the current 
@@ -782,7 +784,7 @@ next_thread_to_run (void)
       max_elem = e;
       highest_pri = t->mlfq_priority;
     }
-    else if(t->priority > highest_pri) {
+    else if(!thread_mlfqs && t->priority > highest_pri) {
       max = t;
       max_elem = e;
       highest_pri = t->priority;
@@ -887,6 +889,11 @@ static bool thread_less_func(const struct list_elem *l, const struct list_elem *
   ASSERT (l != NULL && r != NULL);
   lthread = list_entry(l, struct thread, elem);
   rthread = list_entry(r, struct thread, elem);
-  return (lthread->priority > rthread->priority);
+  if(!thread_mlfqs) {
+    return (lthread->priority > rthread->priority);
+  }
+  else {
+    return (lthread->mlfq_priority > rthread->mlfq_priority);
+  }
 }
 
