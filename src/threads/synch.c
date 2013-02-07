@@ -118,7 +118,7 @@ void sema_up(struct semaphore *sema) {
     ASSERT(sema != NULL);
 
     old_level = intr_disable();
-    //I// sema->value++;
+    sema->value++;
     if (!list_empty(&sema->waiters)) {
         /* Note that I changed sema_down to insert in order by
          * priority, so this will pop the highest priority 
@@ -134,7 +134,6 @@ void sema_up(struct semaphore *sema) {
             thread_yield();
         }
     }
-    sema->value++;
 
     /* Check if the current thread needs to yield. */
     if (other != NULL && other->priority > thread_current()->priority && !thread_mlfqs) {
