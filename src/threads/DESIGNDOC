@@ -14,7 +14,7 @@ Atharv Vaish <avaish@caltech.edu>
 
 >> Specify how many late tokens you are using on this assignment: 
 
-0
+0 (hopefully)
 
 >> What is the Git repository and commit hash for your submission?
 
@@ -139,6 +139,30 @@ makes it take longer inside the timer interrupt handler.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+Oh my goodness...
+
+In thread.h, inside the thread struct:
+
+    int mlfq_priority;                  /*!< Priority for mlfq -- separated
+                                             variable to avoid possible
+                                             conflicts. */
+    int nice;                           /*!< Thread niceness for mlfq. */
+    int recent_cpu;                     /*!< Thread recent_cpu in 17.14
+                                             fixed point arithmetic */
+
+These are to keep the values as needed by the priority calculation.
+
+In thread.c, in the global space:
+
+int f = 1 << 14; // For fixed point arithmetic
+// System load average in 17.14 fixed point number representation.
+static int load_avg;
+
+static bool thread_inited = false;
+
+The last one of these is to make sure calculations don't happen until
+the threading system is initialized.
+
 ---- ALGORITHMS ----
 
 >> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
@@ -146,26 +170,39 @@ makes it take longer inside the timer interrupt handler.
 >> scheduling decision and the priority and recent_cpu values for each
 >> thread after each given number of timer ticks:
 
-timer  recent_cpu    priority   thread
-ticks   A   B   C   A   B   C   to run
------  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+Since 36 < 100, none of the once-per-second stuff occurs.
+
+timer  recent_cpu    priority   thread  ready_list
+ticks   A   B   C   A   B   C   to run    state   (before scheduling occurs)
+-----  --  --  --  --  --  --   ------  ---------
+ 0     0   0   0   63  61  59      A      A->B->C
+ 4     4   0   0   62  61  59      A      B->C->A
+ 8     8   0   0   61  61  59      B      B->C->A
+12     8   4   0   61  60  59      A      C->A->B
+16     12  4   0   60  60  59      B      C->B->A
+20     12  8   0   60  59  59      A      C->A->B
+24     16  8   0   59  59  59      B      C->B->A
+28     16  12  0   59  58  59      C      C->A->B
+32     16  12  4   59  58  58      A      A->B->C
+36     20  12  4   58  58  58      B      B->C->A
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
 
+This doesn't specify when the scheduler was called. My code will
+run the scheduler when a thread uses up its time slice or
+yields/blocks/etc. In the table above, I rescheduled the currently
+running thread whenever a different thread got a higher priority. 
+In practice, I think this uses a lot of time overhead though (checking
+for higher priority threads) so I just let the thread use up its
+time slice.
+
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
+
+There is a lot of updating of every-thread stuff going on with interrupts
+disabled, so this could cause performance issues.
 
 ---- RATIONALE ----
 
@@ -174,12 +211,25 @@ ticks   A   B   C   A   B   C   to run
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
 
+I guess my design works. That is a pretty big advantage. It is also
+pretty much the most straightforward implementation, so I imagine
+it must be pretty easy to understand what it does.
+
+I guess if I had more time I could work a little more on doing fewer
+things with interrupts disabled and inside interrupt contexts.
+
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
 >> decide to implement it the way you did?  If you created an
 >> abstraction layer for fixed-point math, that is, an abstract data
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
+
+I just did it directly, because it was the most straightforward way
+to do it. Implementing a library might have made the code more readable
+but I only had to use fixed-point arithmetic in like three functions
+so it didn't seem that worth it. By the time the thought even came
+to me to do it the other way, I had already written those functions :O
 
 			   SURVEY QUESTIONS
 			   ================
@@ -194,6 +244,8 @@ website.
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
 alarm_clock is fine ~Ilya
+
+mlfq is also fine if I'm not being dumb ~Ilya
 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
