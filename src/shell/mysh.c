@@ -1,13 +1,12 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 #include <unistd.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 // Splits inputs for pipes. Need to free contents of output array.
 char **tokenize_pipes(char *input) {
@@ -211,6 +210,24 @@ void exec_cd(char **tokens) {
     return;
 }
 
+// Displays history.
+void exec_hist(char **tokens) {
+    int length = history_length;
+    int i;
+    if (tokens[1]) {
+        if (tokens[2]) {
+            fprintf(stderr, "history failed: only one argument accepted.\n");
+            return;
+        }
+        length = atoi(tokens[1]);
+    }
+    for (i = length - 1; i >= 0; i--) {
+        printf("%6d %s\n", history_length - i, history_get(
+            history_length - i - 1)->line);
+    }
+    return;
+}
+
 // Splits inputs for redirections. Need to free contents of output array.
 char **tokenize_redirects(char *input) {
     char** tokens = calloc(3, sizeof(char *));
@@ -330,6 +347,9 @@ char **tokenize_redirects(char *input) {
 
 // Invokes a command, assuming it has no pipes.
 int invoke(char *input, int will_fork) {
+    int stdin_copy = dup(0);
+    int stdout_copy = dup(1);
+
     // First, we want to determine whether we need any redirects.
     char **files = tokenize_redirects(input);
     unsigned int i;
@@ -349,10 +369,42 @@ int invoke(char *input, int will_fork) {
         outfiles = tokenize(files[2]);
         outfile = outfiles[0];
     }
+    
+    if (infile) {
+        int in_fd = open(infile, O_RDONLY);
+        if (in_fd == -1) {
+            fprintf(stderr, "open failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        dup2(in_fd, STDIN_FILENO);
+        status = close(in_fd);
+        if (status == -1) {
+            fprintf(stderr, "close failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+    }
+    if (outfile) {
+        int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY,
+                          S_IRUSR | S_IWUSR);
+        if (out_fd == -1) {
+            fprintf(stderr, "open failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        dup2(out_fd, STDOUT_FILENO);
+        status = close(out_fd);
+        if (status == -1) {
+            fprintf(stderr, "close failed: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Handle built in commands.
+    if (!tokens[0]) return 0;
     if (strcmp(tokens[0], "cd") == 0 || strcmp(tokens[0], "chdir") == 0) {
         exec_cd(tokens);
+    }
+    else if (strcmp(tokens[0], "history") == 0) {
+        exec_hist(tokens);
     }
     else if (strcmp(tokens[0], "exit") == 0) {
         exit(EXIT_SUCCESS);
@@ -365,33 +417,6 @@ int invoke(char *input, int will_fork) {
                 exit(EXIT_FAILURE);
             }
             else if (pid == 0) {
-                if (infile) {
-                    int in_fd = open(infile, O_RDONLY);
-                    if (in_fd == -1) {
-                        fprintf(stderr, "open failed: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    dup2(in_fd, STDIN_FILENO);
-                    status = close(in_fd);
-                    if (status == -1) {
-                        fprintf(stderr, "close failed: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                }
-                if (outfile) {
-                    int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY,
-                                      S_IRUSR | S_IWUSR);
-                    if (out_fd == -1) {
-                        fprintf(stderr, "open failed: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    dup2(out_fd, STDOUT_FILENO);
-                    status = close(out_fd);
-                    if (status == -1) {
-                        fprintf(stderr, "close failed: %s\n", strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                }
                 if (execvp(tokens[0], tokens) == -1) {
                     fprintf(stderr, "execvp failed: %s\n", strerror(errno));
                 }
@@ -401,38 +426,14 @@ int invoke(char *input, int will_fork) {
             }
         }
         else {
-            if (infile) {
-                int in_fd = open(infile, O_RDONLY);
-                if (in_fd == -1) {
-                    fprintf(stderr, "open failed: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                dup2(in_fd, STDIN_FILENO);
-                status = close(in_fd);
-                if (status == -1) {
-                    fprintf(stderr, "close failed: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-            }
-            if (outfile) {
-                int out_fd = open(outfile, O_CREAT | O_TRUNC | O_WRONLY, 
-                                  S_IRUSR | S_IWUSR);
-                if (out_fd == -1) {
-                    fprintf(stderr, "open failed: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-                dup2(out_fd, STDOUT_FILENO);
-                status = close(out_fd);
-                if (status == -1) {
-                    fprintf(stderr, "close failed: %s\n", strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-            }
             if (execvp(tokens[0], tokens) == -1) {
                 fprintf(stderr, "execvp failed: %s\n", strerror(errno));
             }
         }
     }
+    
+    dup2(stdin_copy, STDIN_FILENO);
+    dup2(stdout_copy, STDOUT_FILENO);
     
     // Memory management.
     for (i = 0; tokens[i] != NULL; i++) {
@@ -477,6 +478,8 @@ int pipe_invoke(char *input) {
     for (i = 0; pipe_tokens[i] != NULL; i++) {
         num_cmds++;
     }
+    
+    free(input);
     
     // If we have no pipes, just send to invoke (no forks yet)
     if (num_cmds == 1) {
@@ -564,6 +567,8 @@ int pipe_invoke(char *input) {
 }
 
 int main() {
+    char* input, shell_prompt[100];
+    rl_bind_key('\t', rl_complete);
     while(1) {
         char *uname = getlogin();
         if (!uname) {
@@ -576,10 +581,11 @@ int main() {
             exit(EXIT_FAILURE);
         }
         fflush(stdout);
-        fprintf(stdout, "%s:%s> ", uname, cwd);
-        char buf[1024];
-        fgets(buf, 1024, stdin);
-        int status = pipe_invoke(buf);
+        snprintf(shell_prompt, sizeof(shell_prompt), "%s:%s> ", uname, cwd);
+        input = readline(shell_prompt);
+        if (strlen(input) < 1) continue;
+        add_history(input);
+        int status = pipe_invoke(input);
         if (status) {
             fprintf(stderr, "something failed. \n");
             exit(EXIT_FAILURE);
