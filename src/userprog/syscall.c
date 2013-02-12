@@ -32,8 +32,9 @@ void halt(void) {
   shutdown_power_off();
 }
 
-void exit(int status UNUSED) {
-  // TODO: Signal status to kernel, print exit code
+void exit(int status) {
+  // TODO: Signal status to kernel
+  printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
