@@ -78,10 +78,19 @@ int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
   thread_exit();
 }
 
-int write(int fd UNUSED, const void *buffer UNUSED, unsigned size UNUSED) {
+int write(int fd, const void *buffer, unsigned size) {
+  // Writing to the console
+  if(fd == 1) {
+    int offset = 0;
+    while(offset < size-200) {
+      putbuf((char *)(buffer + offset), (size_t) 200);
+      offset = offset + 200;
+    }
+    putbuf((char *)(buffer + offset), (size_t) (size - offset));
+    return size;
+  }
 
-  // TODO
-  thread_exit();
+  return 0;
 }
 
 void seek(int fd UNUSED, unsigned position UNUSED) {
