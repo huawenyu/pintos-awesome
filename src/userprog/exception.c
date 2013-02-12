@@ -137,8 +137,10 @@ static void page_fault(struct intr_frame *f) {
     // If it's caused by the kernel, set %eax to 0xffffffff and and puts
     // its former value into eip
     if(!user) {
+      //printf("Kernel page fault!\n");
       f->eip = f->eax;
       f->eax = 0xffffffff;
+      return;
     }
 
     /* To implement virtual memory, delete the rest of the function

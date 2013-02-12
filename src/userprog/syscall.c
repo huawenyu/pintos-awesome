@@ -80,14 +80,20 @@ int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 }
 
 int write(int fd, const void *buffer, unsigned size) {
+  // Check validity of buffer pointer
+  if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
+    exit(-1);
+    return -1;
+  }
+
   // Writing to the console
   if(fd == 1) {
-    int offset = 0;
-    while(offset < size-200) {
+    size_t offset = 0;
+    while(offset + 200 < size) {
       putbuf((char *)(buffer + offset), (size_t) 200);
       offset = offset + 200;
     }
-    putbuf((char *)(buffer + offset), (size_t) (size - offset));
+    putbuf( (char *)(buffer + offset), (size_t) (size - offset));
     return size;
   }
 
@@ -113,9 +119,9 @@ void close (int fd UNUSED) {
 }
 
 static void syscall_handler(struct intr_frame *f) {
-    printf("system call!\n");
+  //  printf("system call!\n");
     int call_num = get_four_bytes_user(f->esp);
-    printf("Call number: %d\n", call_num);
+  //  printf("Call number: %d\n", call_num);
 
     switch(call_num) {
       case SYS_HALT:
@@ -181,16 +187,16 @@ static int get_four_bytes_user(const void * add) {
   int temp;
   temp = get_user(uaddr);
   if(temp == -1) { exit(11); }
-  result += temp;
+  result += (temp << 0);
   temp = get_user(uaddr + 1);
   if(temp == -1) { exit(11); }
-  result += (temp << 4);
+  result += (temp << 8);
   temp = get_user(uaddr + 2);
   if(temp == -1) { exit(11); }
-  result += (temp << 8);
+  result += (temp << 16);
   temp = get_user(uaddr + 3);
   if(temp == -1) { exit(11); }
-  result += (temp << 12);
+  result += (temp << 24);
   return result;
 }
 
