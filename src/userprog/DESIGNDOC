@@ -160,6 +160,10 @@ unblocks the parent thread so the parent can now see the exit status and return.
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+A process which tries to read above PHYS_BASE or which otherwise
+segfaults will exit with an exit code of -1. When exit is called, it
+should free all the necessary blocks and other stuff.
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
@@ -194,6 +198,10 @@ just frees all its information about C.
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
+
+We used the provided code in the lab, checking that the pointer is in the correct
+region and then dereferencing it, handling kernel pagefaults correctly, 
+as it suggested that this is faster due to taking advantage of a processor's MMU.
 
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
