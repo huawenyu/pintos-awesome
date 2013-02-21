@@ -59,7 +59,6 @@ static void start_process(void *file_name_) {
     if_.eflags = FLAG_IF | FLAG_MBS;
     success = load(file_name, &if_.eip, &if_.esp);
 
-    printf("start_process() esp: %x\n", if_.esp);
     palloc_free_page(0);
 
     /* If load failed, quit. */
@@ -73,9 +72,7 @@ static void start_process(void *file_name_) {
        arguments on the stack in the form of a `struct intr_frame',
        we just point the stack pointer (%esp) to our stack frame
        and jump to it. */
-    printf("DOING ASM STUFF\n");
     asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
-    printf("DONE ASM STUFF\n");
     NOT_REACHED();
 }
 
@@ -307,40 +304,27 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     printf("Initial esp: %x\n", *esp);
     printf("Initial esp address: %x\n", esp);
     /* Set up the stack. */
-    int offset;
-    int argc = 0;    // Number of arguments
+    int argc = 0;     // Number of arguments
     void **argv[256]; // Array of argument addresses on the stack
-    //void **argv = palloc_get_page(0);
+    int offsets[256]; // Array of offsets from the beginning of file_name
+    int offset;
+    char *sp;
+    int len;
 
     fn_copy = palloc_get_page(0);
     if (fn_copy == NULL)
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
 
-    char *sp;
     char *arg = strtok_r(fn_copy, " ", &sp);
-    void *args[256];
-    int  offsets[256];
-    char *prev;
-    int  len;
     offsets[0] = 0;
-    /* esp is initially PHYS_BASE. */
     while (arg != NULL) {
         argc++;
-        printf("arg: %s\n", arg);
-        printf("sp: %x\n", sp);
-        //offset = sp - fn_copy;
-        //*esp -= (offset + 1);
-        //memcpy(*esp, arg, offset);
-        //memset(*esp + offset, '\0', sizeof(char));
-        //argv[argc] = *esp;
-        //printf("argv[%i]: %x\n", argc, *esp);
         offset = sp - fn_copy;
         offsets[argc] = offset;
         arg = strtok_r(NULL, " ", &sp);
     }
     for (i = argc-1; i >= 0; i--) {
-        printf("offset: %i\n", offsets[i]);
         len = offsets[i+1] - offsets[i] - 1;
         if (i == argc-1)
             len += 1;
@@ -348,58 +332,34 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
         argv[i] = *esp;
         memcpy(*esp, fn_copy + offsets[i], len);
         memset(*esp + len, '\0', 1);
-        printf("esp: %x\n", *esp);
     }
-
     palloc_free_page(fn_copy);
-    int tmp;
-    printf("esp before word-alignment: %x, %u\n", *esp, (uint32_t)*esp);
     /* Word-align esp. */
     if (((int) *esp) % 4 != 0) {
-        tmp = (((uint32_t) *esp) % 4);
         *esp -= (((uint32_t) *esp) % 4);
     }
-    printf("Alignment offset: %i\n", tmp);
-    printf("esp: %x\n", (int) *esp);
     /* argv[argc] is set to 0. */
     *esp -= sizeof(char *);
     memset(*esp, 0, sizeof(char *));
-    printf("argv[%i] = 0\n", argc);
-    printf("esp: %x\n", (int) *esp);
     for (i = argc-1; i >= 0; i--) {
         /* argv[i] is set to its address on the stack. */
         *esp -= sizeof(char *);
-        //memset(*esp, argv[i], sizeof(char *));
         *(int *)*esp = argv[i];
-        printf("Arg address: %x\n", argv[i]);
-        printf("esp: %x\n", (int) *esp);
     }
     /* Push argv, then argc. */
     *esp -= sizeof(char **);
-    printf("sizeof(char *) = %u\n", sizeof(char *));
-    printf("DEBUG: %x\n", *esp + sizeof(char *));
-    //memset(*esp, *esp + sizeof(char *), sizeof(char **));
     *(int *)*esp = *esp + sizeof(char *);
-    printf("sizeof(char**): %i\n", sizeof(char **));
-    printf("esp: %x\n", (int) *esp);
     *esp -= sizeof(int);
-    //memset(*esp, argc, sizeof(int));
     *(int *)*esp = argc;
-    printf("sizeof(int): %i\n", sizeof(int));
-    printf("esp: %x\n", (int) *esp);
     /* Push fake return address. */
     *esp -= sizeof(void(*)());
     memset(*esp, 0, sizeof(void(*)()));
-    printf("Done setting up the stack...\n");
-    printf("PHYS_BASE: %x\n", (int)PHYS_BASE);
-    printf("esp: %x\n", (int) *esp);
 
     /* Debugging. */
     hex_dump(0, *esp, ((int)PHYS_BASE - (int)*esp), true);
 
     /* Start address. */
     *eip = (void (*)(void)) ehdr.e_entry;
-    printf("eip: %x\n", *eip);
 
     success = true;
 
