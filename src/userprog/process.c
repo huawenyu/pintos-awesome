@@ -59,6 +59,9 @@ static void start_process(void *file_name_) {
     if_.eflags = FLAG_IF | FLAG_MBS;
     success = load(file_name, &if_.eip, &if_.esp);
 
+    printf("start_process() esp: %x\n", if_.esp);
+    palloc_free_page(0);
+
     /* If load failed, quit. */
     palloc_free_page(file_name);
     if (!success) 
@@ -70,7 +73,9 @@ static void start_process(void *file_name_) {
        arguments on the stack in the form of a `struct intr_frame',
        we just point the stack pointer (%esp) to our stack frame
        and jump to it. */
+    printf("DOING ASM STUFF\n");
     asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
+    printf("DONE ASM STUFF\n");
     NOT_REACHED();
 }
 
@@ -212,6 +217,11 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     /* Open executable file. */
     /* Hacky fix below... */
     char *unused;
+    char *fn_copy;
+    fn_copy = palloc_get_page(0);
+    if (fn_copy == NULL)
+        return TID_ERROR;
+    strlcpy(fn_copy, file_name, PGSIZE);
     char *name = strtok_r(file_name, " ", &unused);
     file = filesys_open(name);
     if (file == NULL) {
@@ -298,18 +308,19 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     int argc = 0;    // Number of arguments
     char *argv[256]; // Array of argument addresses on the stack
     char *sp;
-    char *arg = strtok_r(file_name, " ", &sp);
+    char *arg = strtok_r(fn_copy, " ", &sp);
     /* esp is initially PHYS_BASE. */
     while (arg != NULL) {
-        arg = strtok_r(NULL, " ", &sp);
-        offset = sp - file_name;
+        printf("arg: %s\n", arg);
+        offset = sp - fn_copy;
         *esp -= (offset + 1);
-        memcpy(*esp, sp, offset);
+        memcpy(*esp, arg, offset);
         memset(*esp + offset, '\0', sizeof(char));
         argv[argc] = *esp;
-        printf("argv[%i]: %x\n", argc, *esp);
+        printf("argv[%i]: %s\n", argc, arg);
         printf("esp: %x\n", (int) *esp);
         argc++;
+        arg = strtok_r(NULL, " ", &sp);
     }
     int tmp;
     printf("esp before word-alignment: %x, %u\n", *esp, (uint32_t)*esp);
@@ -472,10 +483,8 @@ static bool setup_stack(void **esp) {
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-        /* DEBUGGING */
         if (success)
             *esp = PHYS_BASE;
-        /* END DEBUGGING */
         else
             palloc_free_page(kpage);
     }
