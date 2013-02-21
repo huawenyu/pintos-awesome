@@ -64,7 +64,7 @@ bool create(const char *file UNUSED, unsigned initial_size UNUSED) {
     get_user(file + initial_size - 1) == -1) {
       exit(-1);
       return -1;
-    }
+  }
   
   lock_acquire(filesys_lock);
   retval = filesys_create(file, initial_size);
@@ -79,7 +79,7 @@ bool remove(const char *file UNUSED) {
   if (file >= PHYS_BASE || get_user(file) == -1) {
       exit(-1);
       return -1;
-    }
+  }
   
   lock_acquire(filesys_lock);
   retval = filesys_remove(file);
@@ -87,10 +87,35 @@ bool remove(const char *file UNUSED) {
   return retval;
 }
 
-int open (const char *file UNUSED) {
-
-  // TODO
-  thread_exit();
+int open (const char *file) {
+  struct file *f;
+  struct file_desc fd;
+  
+  // Check validity of file pointer
+  if (file >= PHYS_BASE || get_user(file) == -1) {
+      exit(-1);
+      return -1;
+  }
+  
+  lock_acquire(filesys_lock);
+  f = filesys_open(file);
+  if (!f) {
+    lock_release(filesys_lock);
+    return -1;
+  }
+  lock_release(filesys_lock);
+  
+  fd.file = f;
+  if (list_empty(&(thread_current()->file_descs))) {
+    fd.id = 3;
+  }
+  else {
+    fd.id = list_entry(list_back(&(thread_current()->file_descs)), 
+      struct file_desc, elem)->id + 1;
+  }
+  list_push_back(&(thread_current()->file_descs), &(fd.elem));
+  
+  return fd.id;
 }
 
 int filesize(int fd UNUSED) {

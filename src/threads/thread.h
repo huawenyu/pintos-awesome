@@ -90,6 +90,7 @@ typedef int tid_t;
 */
 struct file_desc {
     int id;
+    struct list_elem elem;
     struct file *file;
 };
 

@@ -730,6 +730,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0; // TODO figure out how to inherit from parent
   t->original_priority = priority;
   list_init(&t->locks);
+#ifdef USERPROG
+  list_init(&t->file_descs);
+  list_init(&t->child_threads);
+#endif
   t->desired_lock = NULL;
   t->magic = THREAD_MAGIC;
   t->sleep_end = 0;
