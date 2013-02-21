@@ -291,6 +291,8 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     if (!setup_stack(esp))
         goto done;
 
+    printf("Setting up the stack...\n");
+    printf("Initial esp: %x\n", *esp);
     /* Set up the stack. */
     int offset;
     int argc = 0;    // Number of arguments
@@ -301,30 +303,54 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     while (arg != NULL) {
         arg = strtok_r(NULL, " ", &sp);
         offset = sp - file_name;
-        esp -= (offset + 1);
-        memcpy(esp, sp, offset);
-        *(esp + offset) = '\0';
-        argv[argc] = sp;
+        *esp -= (offset + 1);
+        memcpy(*esp, sp, offset);
+        memset(*esp + offset, '\0', sizeof(char));
+        argv[argc] = *esp;
+        printf("argv[%i]: %x\n", argc, *esp);
+        printf("esp: %x\n", (int) *esp);
         argc++;
     }
+    int tmp;
+    printf("esp before word-alignment: %x, %u\n", *esp, (uint32_t)*esp);
     /* Word-align esp. */
-    if (((int) esp) % 4 != 0)
-        esp -= 4 - (((int) esp) % 4);
+    if (((int) *esp) % 4 != 0) {
+        tmp = (((uint32_t) *esp) % 4);
+        *esp -= (((uint32_t) *esp) % 4);
+    }
+    printf("Alignment offset: %i\n", tmp);
+    printf("esp: %x\n", (int) *esp);
     /* argv[argc] is set to 0. */
-    memset(esp, 0, sizeof(char *));
-    esp -= sizeof(char *);
+    *esp -= sizeof(char *);
+    memset(*esp, 0, sizeof(char *));
+    printf("argv[%i] = 0\n", argc);
+    printf("esp: %x\n", (int) *esp);
     for (i = 0; i < argc; i++) {
         /* argv[i] is set to its address on the stack. */
-        memset(esp, argv[i], sizeof(char *));
-        esp -= sizeof(char *);
+        *esp -= sizeof(char *);
+        memset(*esp, argv[i], sizeof(char *));
+        printf("Arg address: %x\n", argv[i]);
+        printf("esp: %x\n", (int) *esp);
     }
     /* Push argv, then argc. */
-    memset(esp, esp + sizeof(char *), sizeof(char **));
-    esp -= sizeof(char **);
-    memset(esp, argc, sizeof(int));
-    esp -= sizeof(int);
+    *esp -= sizeof(char **);
+    memset(*esp, *esp + sizeof(char *), sizeof(char **));
+    printf("sizeof(char**): %i\n", sizeof(char **));
+    printf("esp: %x\n", (int) *esp);
+    *esp -= sizeof(int);
+    memset(*esp, argc, sizeof(int));
+    printf("sizeof(int): %i\n", sizeof(int));
+    printf("esp: %x\n", (int) *esp);
     /* Push fake return address. */
-    memset(esp, 0, sizeof(void(*)()));
+    *esp -= sizeof(void(*)());
+    memset(*esp, 0, sizeof(void(*)()));
+    printf("Done setting up the stack...\n");
+    printf("PHYS_BASE: %x\n", (int)PHYS_BASE);
+    printf("esp: %x\n", (int) *esp);
+
+
+    /* Debugging. */
+    hex_dump(0, *esp, ((int)PHYS_BASE - (int)*esp), true);
 
     /* Start address. */
     *eip = (void (*)(void)) ehdr.e_entry;
@@ -446,8 +472,10 @@ static bool setup_stack(void **esp) {
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+        /* DEBUGGING */
         if (success)
-            *esp = PHYS_BASE - 12; // Temporary measure for minimial userprogs
+            *esp = PHYS_BASE;
+        /* END DEBUGGING */
         else
             palloc_free_page(kpage);
     }
