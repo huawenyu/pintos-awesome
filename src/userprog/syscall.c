@@ -37,24 +37,30 @@ void halt(void) {
 }
 
 void exit(int status) {
-  // TODO: Signal status to kernel
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
+// call process execute, get pid, set as child of current thread
 pid_t exec(const char *cmd_line UNUSED) {
   // TODO
   thread_exit();
 }
 
-int wait(pid_t pid UNUSED) {
-
-  // TODO
-  thread_exit();
+int wait(pid_t pid) {
+  return process_wait(pid);
 }
 
 bool create(const char *file, unsigned initial_size) {
     bool retval;
+    
+    // Check validity of file pointer
+    if (file + initial_size - 1 >= PHYS_BASE || 
+      get_user(file + initial_size - 1) == -1) {
+      
+      exit(-1);
+      return -1;
+    }
     
     lock_acquire(filesys_lock);
     retval = filesys_create(file, initial_size);
@@ -94,9 +100,9 @@ int write(int fd, const void *buffer, unsigned size) {
   }
 
   // Writing to the console
-  if(fd == 1) {
+  if (fd == 1) {
     size_t offset = 0;
-    while(offset + 200 < size) {
+    while (offset + 200 < size) {
       putbuf((char *)(buffer + offset), (size_t) 200);
       offset = offset + 200;
     }

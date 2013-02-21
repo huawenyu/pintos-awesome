@@ -88,6 +88,11 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list.
 */
+struct file_desc {
+    int id;
+    struct file *file;
+}
+
 struct thread {
     /*! Owned by thread.c. */
     /**@{*/
@@ -117,6 +122,9 @@ struct thread {
 #ifdef USERPROG
     /*! Owned by userprog/process.c. */
     /**@{*/
+    struct thread *parent;
+    struct list file_descs;
+    struct list child_threads;
     uint32_t *pagedir;                  /*!< Page directory. */
     /**@{*/
 #endif
@@ -128,6 +136,8 @@ struct thread {
     unsigned magic;                     /* Detects stack overflow. */
     /**@}*/
 };
+
+struct 
 
 /*! If false (default), use round-robin scheduler.
     If true, use multi-level feedback queue scheduler.
