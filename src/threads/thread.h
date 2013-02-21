@@ -91,7 +91,7 @@ typedef int tid_t;
 struct file_desc {
     int id;
     struct file *file;
-}
+};
 
 struct thread {
     /*! Owned by thread.c. */
@@ -136,8 +136,6 @@ struct thread {
     unsigned magic;                     /* Detects stack overflow. */
     /**@}*/
 };
-
-struct 
 
 /*! If false (default), use round-robin scheduler.
     If true, use multi-level feedback queue scheduler.

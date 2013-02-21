@@ -5,8 +5,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/synch.h"
-#include "filesys/filesys.h"
+#include "userprog/process.h"
 
 static void syscall_handler(struct intr_frame *);
 static int get_four_bytes_user(const void *);
@@ -26,8 +25,6 @@ void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
 
-static struct lock *filesys_lock;
-
 void syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -36,36 +33,28 @@ void halt(void) {
   shutdown_power_off();
 }
 
+// TODO: need to save status somewhere where parent thread can access
 void exit(int status) {
+  // TODO: Signal status to kernel
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
 
-// call process execute, get pid, set as child of current thread
+// TODO: call process execute, get pid, set as child of current thread
 pid_t exec(const char *cmd_line UNUSED) {
   // TODO
   thread_exit();
 }
 
+// TODO: implementation deferred
 int wait(pid_t pid) {
   return process_wait(pid);
 }
 
-bool create(const char *file, unsigned initial_size) {
-    bool retval;
-    
-    // Check validity of file pointer
-    if (file + initial_size - 1 >= PHYS_BASE || 
-      get_user(file + initial_size - 1) == -1) {
-      
-      exit(-1);
-      return -1;
-    }
-    
-    lock_acquire(filesys_lock);
-    retval = filesys_create(file, initial_size);
-    lock_release(filesys_lock);
-    return retval;
+bool create(const char *file UNUSED, unsigned initial_size UNUSED) {
+
+  // TODO
+  thread_exit();
 }
 
 bool remove(const char *file UNUSED) {
@@ -100,9 +89,9 @@ int write(int fd, const void *buffer, unsigned size) {
   }
 
   // Writing to the console
-  if (fd == 1) {
+  if(fd == 1) {
     size_t offset = 0;
-    while (offset + 200 < size) {
+    while(offset + 200 < size) {
       putbuf((char *)(buffer + offset), (size_t) 200);
       offset = offset + 200;
     }
