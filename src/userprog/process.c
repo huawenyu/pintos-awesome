@@ -36,6 +36,9 @@ tid_t process_execute(const char *file_name) {
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
 
+    char *unused;
+    file_name = strtok_r(file_name, " ", &unused);
+
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
     if (tid == TID_ERROR)
@@ -207,9 +210,12 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     process_activate();
 
     /* Open executable file. */
-    file = filesys_open(file_name);
+    /* Hacky fix below... */
+    char *unused;
+    char *name = strtok_r(file_name, " ", &unused);
+    file = filesys_open(name);
     if (file == NULL) {
-        printf("load: %s: open failed\n", file_name);
+        printf("load: %s: open failed\n", name);
         goto done; 
     }
 
@@ -284,6 +290,41 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     /* Set up stack. */
     if (!setup_stack(esp))
         goto done;
+
+    /* Set up the stack. */
+    int offset;
+    int argc = 0;    // Number of arguments
+    char *argv[256]; // Array of argument addresses on the stack
+    char *sp;
+    char *arg = strtok_r(file_name, " ", &sp);
+    /* esp is initially PHYS_BASE. */
+    while (arg != NULL) {
+        arg = strtok_r(NULL, " ", &sp);
+        offset = sp - file_name;
+        esp -= (offset + 1);
+        memcpy(esp, sp, offset);
+        *(esp + offset) = '\0';
+        argv[argc] = sp;
+        argc++;
+    }
+    /* Word-align esp. */
+    if (((int) esp) % 4 != 0)
+        esp -= 4 - (((int) esp) % 4);
+    /* argv[argc] is set to 0. */
+    memset(esp, 0, sizeof(char *));
+    esp -= sizeof(char *);
+    for (i = 0; i < argc; i++) {
+        /* argv[i] is set to its address on the stack. */
+        memset(esp, argv[i], sizeof(char *));
+        esp -= sizeof(char *);
+    }
+    /* Push argv, then argc. */
+    memset(esp, esp + sizeof(char *), sizeof(char **));
+    esp -= sizeof(char **);
+    memset(esp, argc, sizeof(int));
+    esp -= sizeof(int);
+    /* Push fake return address. */
+    memset(esp, 0, sizeof(void(*)()));
 
     /* Start address. */
     *eip = (void (*)(void)) ehdr.e_entry;
