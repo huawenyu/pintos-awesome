@@ -94,6 +94,13 @@ struct file_desc {
     struct file *file;
 };
 
+struct child_thread {
+    int pid;
+    int exit_status;
+    bool exited;
+    struct list_elem elem;
+};
+
 struct thread {
     /*! Owned by thread.c. */
     /**@{*/
@@ -123,7 +130,7 @@ struct thread {
 #ifdef USERPROG
     /*! Owned by userprog/process.c. */
     /**@{*/
-    struct thread *parent;
+    int parent_pid;
     struct list file_descs;
     struct list child_threads;
     uint32_t *pagedir;                  /*!< Page directory. */

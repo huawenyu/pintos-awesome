@@ -119,13 +119,12 @@ int open (const char *file) {
 }
 
 int filesize(int fd) {
-  struct file *f;
+  struct file_desc *d = get_file_descriptor(fd);
   int retval = -1;
   
-  f = get_file_descriptor(fd)->file;
-  if (f) {
+  if (d && d->file) {
     lock_acquire(filesys_lock);
-    retval = file_length(f);
+    retval = file_length(d->file);
     lock_release(filesys_lock);
   }
   
@@ -139,7 +138,6 @@ int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 }
 
 int write(int fd, const void *buffer, unsigned size) {
-  struct file *f;
   int retval = -1;
   
   // Check validity of buffer pointer
@@ -159,10 +157,10 @@ int write(int fd, const void *buffer, unsigned size) {
     return size;
   }
   
-  f = get_file_descriptor(fd)->file;
-  if (f) {
+  struct file_desc *d = get_file_descriptor(fd);
+  if (d && d->file) {
     lock_acquire(filesys_lock);
-    retval = file_write(f, buffer, size);
+    retval = file_write(d->file, buffer, size);
     lock_release(filesys_lock);
   }
   
@@ -170,34 +168,37 @@ int write(int fd, const void *buffer, unsigned size) {
 }
 
 void seek(int fd, unsigned position) {
-  struct file *f;
+  struct file_desc *d = get_file_descriptor(fd);
   
-  f = get_file_descriptor(fd)->file;
-  if (f) {
+  if (d && d->file) {
     lock_acquire(filesys_lock);
-    file_seek(f, position);
+    file_seek(d->file, position);
     lock_release(filesys_lock);
   }
 }
 
 unsigned tell(int fd) {
-  struct file *f;
+  struct file_desc *d = get_file_descriptor(fd);
   int retval = -1;
   
-  f = get_file_descriptor(fd)->file;
-  if (f) {
+  if (d && d->file) {
     lock_acquire(filesys_lock);
-    retval = file_tell(f);
+    retval = file_tell(d->file);
     lock_release(filesys_lock);
   }
   
   return retval;
 }
 
-void close (int fd UNUSED) {
-
-  // TODO
-  thread_exit();
+void close (int fd) {
+  struct file_desc *d = get_file_descriptor(fd);
+  if (d && d->file) {
+    lock_acquire(filesys_lock);
+    file_close(d->file);
+    lock_release(filesys_lock);
+  }
+  
+  list_remove(&(thread_current()->file_descs), d);
 }
 
 static struct file_desc *get_file_descriptor(int fd) {
