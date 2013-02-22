@@ -95,7 +95,7 @@ struct file_desc {
 };
 
 struct child_thread {
-    int pid;
+    tid_t pid;
     int exit_status;
     bool exited;
     bool waiting;
@@ -131,7 +131,7 @@ struct thread {
 #ifdef USERPROG
     /*! Owned by userprog/process.c. */
     /**@{*/
-    int parent_pid;
+    tid_t parent_pid;
     struct list file_descs;
     struct list child_threads;
     uint32_t *pagedir;                  /*!< Page directory. */

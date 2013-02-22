@@ -57,7 +57,7 @@ void exit(int status) {
   printf("PARENT: %d\n", curr->parent_pid);
   printf("ME: %d\n", curr->tid);
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
-  printf("PARENT: %s\n", parent->tid);
+  printf("PARENT: %s\n", parent->name);
   for (e = list_begin(&(parent->child_threads));
        e != list_end(&(parent->child_threads));
        e = list_next(e)) {

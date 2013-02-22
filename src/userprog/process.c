@@ -49,13 +49,13 @@ tid_t process_execute(const char *file_name) {
     printf("NEW TID: %d\n", tid);
     printf("OLD TID: %d\n", curr->tid);
     
-    child.pid = (int) tid;
+    child.pid = tid;
     child.exited = false;
     child.waiting = false;
     list_push_back(&(curr->child_threads), &child.elem);
     // Update child thread to know parent thread
     child_t = get_thread_from_tid(tid);
-    child_t->parent_pid = (int) curr->tid;
+    child_t->parent_pid = curr->tid;
     
     if (tid == TID_ERROR)
         palloc_free_page(fn_copy); 
@@ -103,19 +103,22 @@ static void start_process(void *file_name_) {
 int process_wait(tid_t child_tid) {
   // TODO: Real implementation
   struct thread *curr = thread_current();
-  struct list_elem *e;
+  struct list_elem *e = list_begin(&(curr->child_threads));
   struct child_thread *child;
   /* Check if the input tid is in the child list. */
   bool in_list = false;
-  for (e = list_begin(&(curr->child_threads));
-       e != list_end(&(curr->child_threads));
-       e = list_next(e)) {
+  while (e != list_end(&(curr->child_threads))) {
     struct child_thread *ct = list_entry(e, struct child_thread, elem);
-    if ((int)(ct->pid) == (int)child_tid) {
+    printf("%u\n", ct->pid);
+    if (ct->pid == child_tid) {
       child = ct;
       in_list = true;
+      break;
     }
+    e = list_next(e);
   }
+  printf("GOT HERE!!!!\n");
+  printf("%d\n", in_list);
   if (!in_list)
     return -1;
 
