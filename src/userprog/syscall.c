@@ -42,6 +42,16 @@ void halt(void) {
 // TODO: need to save status somewhere where parent thread can access
 void exit(int status) {
   printf("%s: exit(%d)\n", thread_current()->name, status);
+  struct thread *curr = thread_current();
+  struct file_desc *fd;
+  struct list_elem *l;
+  while (!list_empty(&(curr->file_descs))) {
+    l = list_begin(&(curr->file_descs));
+    fd = list_entry(l, struct file_desc, elem);
+    /* This should remove the fd from the fd list. */
+    close(fd);
+  }
+  //TODO: Update parent's child thread status list
   thread_exit();
 }
 
