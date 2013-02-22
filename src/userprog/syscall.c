@@ -245,9 +245,9 @@ void close (int fd) {
     lock_acquire(&filesys_lock);
     file_close(d->file);
     lock_release(&filesys_lock);
+    
+    list_remove(&(d->elem));
   }
-  
-  list_remove(&(d->elem));
 }
 
 static struct file_desc *get_file_descriptor(int fd) {
