@@ -890,7 +890,7 @@ struct thread *get_thread_from_tid(tid_t tid) {
          e = list_next(e)) {
   
     struct thread *t = list_entry(e, struct thread, allelem);
-        if (t->tid = tid) {
+        if (t->tid == tid) {
             return t;
         }
     }

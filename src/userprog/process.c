@@ -27,6 +27,9 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
     cannot be created. */
 tid_t process_execute(const char *file_name) {
     char *fn_copy;
+    struct thread *curr = thread_current();
+    struct thread *child_t;
+    struct child_thread child;
     tid_t tid;
 
     /* Make a copy of FILE_NAME.
@@ -39,8 +42,21 @@ tid_t process_execute(const char *file_name) {
     //char *unused;
     //file_name = strtok_r(file_name, " ", &unused);
 
+    printf("OLD TID: %d\n", curr->tid);
+
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
+    printf("NEW TID: %d\n", tid);
+    printf("OLD TID: %d\n", curr->tid);
+    
+    child.pid = (int) tid;
+    child.exited = false;
+    child.waiting = false;
+    list_push_back(&(curr->child_threads), &child.elem);
+    // Update child thread to know parent thread
+    child_t = get_thread_from_tid(tid);
+    child_t->parent_pid = (int) curr->tid;
+    
     if (tid == TID_ERROR)
         palloc_free_page(fn_copy); 
     return tid;

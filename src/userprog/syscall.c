@@ -54,7 +54,10 @@ void exit(int status) {
     close(fd->id);
   }
   // Update parent, unblock if necessary
+  printf("PARENT: %d\n", curr->parent_pid);
+  printf("ME: %d\n", curr->tid);
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
+  printf("PARENT: %s\n", parent->tid);
   for (e = list_begin(&(parent->child_threads));
        e != list_end(&(parent->child_threads));
        e = list_next(e)) {
@@ -69,25 +72,14 @@ void exit(int status) {
 }
 
 pid_t exec(const char *cmd_line) {
-  struct thread *curr = thread_current();
-  struct thread *child_t;
-  struct child_thread child;
   tid_t child_tid;
 
   // TODO: Add synchronization somewhere
-  // Call process_execute()
-  // Get child thread id
+  lock_acquire(&filesys_lock);
   child_tid = process_execute(cmd_line);
-  // Initialize parent's child_thread struct
-  // Save that to parent's child thread list
-  child.pid = (int) child_tid;
-  child.exited = false;
-  list_push_back(&(curr->child_threads), &child.elem);
-  // Update child thread to know parent thread
-  child_t = get_thread_from_tid(child_tid);
-  child_t->parent_pid = (int) curr->tid;
+  lock_release(&filesys_lock);
 
-  thread_exit();
+  return child_tid;
 }
 
 int wait(pid_t pid) {
@@ -269,7 +261,7 @@ static struct file_desc *get_file_descriptor(int fd) {
        e = list_next(e)) {
   
     struct file_desc *d = list_entry(e, struct file_desc, elem);
-    if (d->id = fd) {
+    if (d->id == fd) {
       return d;
     }
   }
