@@ -99,6 +99,7 @@ struct child_thread {
     int exit_status;
     bool exited;
     struct list_elem elem;
+    bool waiting;
 };
 
 struct thread {

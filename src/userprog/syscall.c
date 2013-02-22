@@ -80,7 +80,6 @@ pid_t exec(const char *cmd_line) {
   thread_exit();
 }
 
-// TODO: implementation deferred
 int wait(pid_t pid) {
   return process_wait(pid);
 }
