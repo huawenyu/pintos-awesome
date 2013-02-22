@@ -41,7 +41,6 @@ void halt(void) {
   shutdown_power_off();
 }
 
-// TODO: need to save status somewhere where parent thread can access
 void exit(int status) {
   printf("%s: exit(%d)\n", thread_current()->name, status);
   struct thread *curr = thread_current();
@@ -53,11 +52,12 @@ void exit(int status) {
     /* This should remove the fd from the fd list. */
     close(fd->id);
   }
-  //TODO: Update parent's child thread status list
+  // Update parent, unblock if necessary
+  struct thread *parent = get_thread_from_tid(curr->parent_pid);
+  
   thread_exit();
 }
 
-// TODO: call process execute, get pid, set as child of current thread
 pid_t exec(const char *cmd_line) {
   struct thread *curr = thread_current();
   struct thread *child_t;
@@ -80,7 +80,6 @@ pid_t exec(const char *cmd_line) {
   thread_exit();
 }
 
-// TODO: implementation deferred
 int wait(pid_t pid) {
   return process_wait(pid);
 }
@@ -160,10 +159,32 @@ int filesize(int fd) {
   return retval;
 }
 
-int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
+int read(int fd, void *buffer, unsigned size) {
+  int retval = -1;
+  int offset;
+  
+  // Check validity of buffer pointer
+  if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
+    exit(-1);
+    return -1;
+  }
 
-  // TODO
-  thread_exit();
+  // Reading from console
+  if(fd == 0) {
+    for (offset = 0; offset != size; ++offset) {
+      *(uint8_t *)(buffer + offset) = input_getc();
+    }
+    return size;
+  }
+  
+  struct file_desc *d = get_file_descriptor(fd);
+  if (d && d->file) {
+    lock_acquire(&filesys_lock);
+    retval = file_read(d->file, buffer, size);
+    lock_release(&filesys_lock);
+  }
+  
+  return retval;
 }
 
 int write(int fd, const void *buffer, unsigned size) {
