@@ -54,10 +54,7 @@ void exit(int status) {
     close(fd->id);
   }
   // Update parent, unblock if necessary
-  printf("PARENT: %d\n", curr->parent_pid);
-  printf("ME: %d\n", curr->tid);
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
-  printf("PARENT: %s\n", parent->name);
   for (e = list_begin(&(parent->child_threads));
        e != list_end(&(parent->child_threads));
        e = list_next(e)) {
@@ -119,7 +116,7 @@ bool remove(const char *file) {
 
 int open (const char *file) {
   struct file *f;
-  struct file_desc fd;
+  struct file_desc *fd = palloc_get_page(0);
   
   // Check validity of file pointer
   if (file >= PHYS_BASE || get_user(file) == -1) {
@@ -135,17 +132,17 @@ int open (const char *file) {
   }
   lock_release(&filesys_lock);
   
-  fd.file = f;
+  fd->file = f;
   if (list_empty(&(thread_current()->file_descs))) {
-    fd.id = 3;
+    fd->id = 3;
   }
   else {
-    fd.id = list_entry(list_back(&(thread_current()->file_descs)), 
+    fd->id = list_entry(list_back(&(thread_current()->file_descs)), 
       struct file_desc, elem)->id + 1;
   }
-  list_push_back(&(thread_current()->file_descs), &(fd.elem));
+  list_push_back(&(thread_current()->file_descs), &(fd->elem));
   
-  return fd.id;
+  return fd->id;
 }
 
 int filesize(int fd) {

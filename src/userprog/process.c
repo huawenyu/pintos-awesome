@@ -27,9 +27,10 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
     cannot be created. */
 tid_t process_execute(const char *file_name) {
     char *fn_copy;
+    char *fn_copy2;
     struct thread *curr = thread_current();
     struct thread *child_t;
-    struct child_thread child;
+    struct child_thread *child = palloc_get_page(0);
     tid_t tid;
 
     /* Make a copy of FILE_NAME.
@@ -38,21 +39,25 @@ tid_t process_execute(const char *file_name) {
     if (fn_copy == NULL)
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
+    
+    /* Make a copy of FILE_NAME.
+       Otherwise there's a race between the caller and load(). */
+    fn_copy2 = palloc_get_page(0);
+    if (fn_copy2 == NULL)
+        return TID_ERROR;
+    strlcpy(fn_copy2, file_name, PGSIZE);
 
-    //char *unused;
-    //file_name = strtok_r(file_name, " ", &unused);
-
-    printf("OLD TID: %d\n", curr->tid);
+    char *unused;
+    char *pname = strtok_r(fn_copy2, " ", &unused);
 
     /* Create a new thread to execute FILE_NAME. */
-    tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
-    printf("NEW TID: %d\n", tid);
-    printf("OLD TID: %d\n", curr->tid);
+    tid = thread_create(pname, PRI_DEFAULT, start_process, fn_copy);
     
-    child.pid = tid;
-    child.exited = false;
-    child.waiting = false;
-    list_push_back(&(curr->child_threads), &child.elem);
+    child->pid = tid;
+    child->exited = false;
+    child->waiting = false;
+    child->exit_status = -1;
+    list_push_back(&(curr->child_threads), &(child->elem));
     // Update child thread to know parent thread
     child_t = get_thread_from_tid(tid);
     child_t->parent_pid = curr->tid;
@@ -109,7 +114,6 @@ int process_wait(tid_t child_tid) {
   bool in_list = false;
   while (e != list_end(&(curr->child_threads))) {
     struct child_thread *ct = list_entry(e, struct child_thread, elem);
-    printf("%u\n", ct->pid);
     if (ct->pid == child_tid) {
       child = ct;
       in_list = true;
@@ -117,8 +121,7 @@ int process_wait(tid_t child_tid) {
     }
     e = list_next(e);
   }
-  printf("GOT HERE!!!!\n");
-  printf("%d\n", in_list);
+  
   if (!in_list)
     return -1;
 
@@ -136,7 +139,9 @@ int process_wait(tid_t child_tid) {
     return child->exit_status;
   }
   else {
+    intr_disable ();
     thread_block();
+    intr_enable ();
   }
   list_remove(&(child->elem));
   return child->exit_status;
@@ -351,10 +356,7 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     /* Set up stack. */
     if (!setup_stack(esp))
         goto done;
-
-    printf("Setting up the stack...\n");
-    printf("Initial esp: %x\n", *esp);
-    printf("Initial esp address: %x\n", esp);
+    
     /* Set up the stack. */
     int argc = 0;     // Number of arguments
     void **argv[256]; // Array of argument addresses on the stack
@@ -406,9 +408,6 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     /* Push fake return address. */
     *esp -= sizeof(void(*)());
     memset(*esp, 0, sizeof(void(*)()));
-
-    /* Debugging. */
-    hex_dump(0, *esp, ((int)PHYS_BASE - (int)*esp), true);
 
     /* Start address. */
     *eip = (void (*)(void)) ehdr.e_entry;
