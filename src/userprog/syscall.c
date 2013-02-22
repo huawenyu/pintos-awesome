@@ -58,6 +58,24 @@ void exit(int status) {
 // TODO: call process execute, get pid, set as child of current thread
 pid_t exec(const char *cmd_line UNUSED) {
   // TODO
+  struct thread *curr = thread_current();
+  struct thread *child_t;
+  struct child_thread child;
+  tid child_tid;
+
+  // TODO: Add synchronization somewhere
+  // Call process_execute()
+  // Get child thread id
+  child_tid = process_execute(cmd_line);
+  // Initialize parent's child_thread struct
+  // Save that to parent's child thread list
+  child.pid = (int) child_tid;
+  child.exited = false;
+  list_push_back(&(curr->child_threads), &child.elem);
+  // Update child thread to know parent thread
+  child_t = get_thread_from_tid(child_tid);
+  child_t->parent_pid = (int) curr->tid;
+
   thread_exit();
 }
 
