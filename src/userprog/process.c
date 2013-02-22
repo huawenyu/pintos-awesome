@@ -84,10 +84,43 @@ static void start_process(void *file_name_) {
 
     This function will be implemented in problem 2-2.  For now, it does
     nothing. */
-int process_wait(tid_t child_tid UNUSED) {
+int process_wait(tid_t child_tid) {
   // TODO: Real implementation
-  while(true) { }
-  return -1;
+  struct thread *curr = thread_current();
+  struct list_elem *e;
+  struct child_thread *child;
+  /* Check if the input tid is in the child list. */
+  bool in_list = false;
+  for (e = list_begin(&(curr->child_threads));
+       e != list_end(&(curr->child_threads));
+       e = list_next(e)) {
+    struct child_thread *ct = list_entry(e, struct child_thread, elem);
+    if ((int)(ct->pid) == (int)child_tid) {
+      child = ct;
+      in_list = true;
+    }
+  }
+  if (!in_list)
+    return -1;
+
+  /* Check if we're already waiting on the child. */
+  if (child->waiting)
+    return -1;
+  /* Otherwise, we're now waiting on it. */
+  else
+    child->waiting = true;
+
+  /* Check if child is done. */
+  if (child->exited) {
+    /* If it's done, remove it from the child list and return its exit status. */
+    list_remove(&(child->elem));
+    return child->exit_status;
+  }
+  else {
+    thread_block();
+  }
+  list_remove(&(child->elem));
+  return child->exit_status;
 }
 
 /*! Free the current process's resources. */
