@@ -59,11 +59,10 @@ void exit(int status) {
 
 // TODO: call process execute, get pid, set as child of current thread
 pid_t exec(const char *cmd_line UNUSED) {
-  // TODO
   struct thread *curr = thread_current();
   struct thread *child_t;
   struct child_thread child;
-  tid child_tid;
+  tid_t child_tid;
 
   // TODO: Add synchronization somewhere
   // Call process_execute()
