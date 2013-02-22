@@ -171,16 +171,13 @@ int write(int fd, const void *buffer, unsigned size) {
 
 void seek(int fd, unsigned position) {
   struct file *f;
-  int retval = -1;
   
   f = get_file_descriptor(fd)->file;
   if (f) {
     lock_acquire(filesys_lock);
-    retval = file_seek(f, position);
+    file_seek(f, position);
     lock_release(filesys_lock);
   }
-  
-  return retval;
 }
 
 unsigned tell(int fd) {
