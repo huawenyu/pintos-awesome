@@ -369,6 +369,25 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     if (fn_copy == NULL)
         return TID_ERROR;
     strlcpy(fn_copy, file_name, PGSIZE);
+    /* Remove extra spaces. */
+    bool space = false;
+    int elem = 0;
+    int shift = 0;
+    while (fn_copy[elem] != '\0') {
+        if (fn_copy[elem] == ' ' && space) {
+            shift++;
+        }
+        else if (fn_copy[elem] == ' ' && !space) {
+            space = true;
+        }
+        else if (space) {
+            space = false;
+        }
+        fn_copy[elem] = fn_copy[elem + shift];
+        if (fn_copy[elem] == '\0')
+            break;
+        elem++;
+    }
 
     char *arg = strtok_r(fn_copy, " ", &sp);
     offsets[0] = 0;
