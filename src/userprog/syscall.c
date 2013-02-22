@@ -46,6 +46,7 @@ void exit(int status) {
   struct thread *curr = thread_current();
   struct file_desc *fd;
   struct list_elem *l;
+  struct list_elem *e;
   while (!list_empty(&(curr->file_descs))) {
     l = list_begin(&(curr->file_descs));
     fd = list_entry(l, struct file_desc, elem);
@@ -54,7 +55,16 @@ void exit(int status) {
   }
   // Update parent, unblock if necessary
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
-  
+  for (e = list_begin(&(parent->child_threads));
+       e != list_end(&(parent->child_threads));
+       e = list_next(e)) {
+    struct child_thread *ct = list_entry(e, struct child_thread, elem);
+    if (ct->pid == curr->tid) {
+      ct->exited = true;
+      ct->exit_status = status;
+      if (ct->waiting) thread_unblock(parent);
+    }
+  }
   thread_exit();
 }
 
