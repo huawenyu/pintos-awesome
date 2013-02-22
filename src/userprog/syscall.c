@@ -247,7 +247,7 @@ void close (int fd) {
     lock_release(&filesys_lock);
   }
   
-  list_remove(d);
+  list_remove(&(d->elem));
 }
 
 static struct file_desc *get_file_descriptor(int fd) {
