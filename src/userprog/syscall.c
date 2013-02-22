@@ -14,6 +14,7 @@ static void syscall_handler(struct intr_frame *);
 static int get_four_bytes_user(const void *);
 static int get_user(const uint8_t *);
 static bool put_user(uint8_t *, uint8_t);
+static struct file_desc *get_file_descriptor(int fd);
 void halt(void);
 void exit(int);
 pid_t exec(const char*);
@@ -31,7 +32,7 @@ void close(int);
 static struct lock *filesys_lock;
 
 void syscall_init(void) {
-    intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+  intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 void halt(void) {
@@ -40,7 +41,6 @@ void halt(void) {
 
 // TODO: need to save status somewhere where parent thread can access
 void exit(int status) {
-  // TODO: Signal status to kernel
   printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
 }
@@ -56,7 +56,7 @@ int wait(pid_t pid) {
   return process_wait(pid);
 }
 
-bool create(const char *file UNUSED, unsigned initial_size UNUSED) {
+bool create(const char *file, unsigned initial_size) {
  	bool retval;
   
   // Check validity of file pointer
@@ -72,7 +72,7 @@ bool create(const char *file UNUSED, unsigned initial_size UNUSED) {
   return retval;
 }
 
-bool remove(const char *file UNUSED) {
+bool remove(const char *file) {
  	bool retval;
   
   // Check validity of file pointer
@@ -118,10 +118,18 @@ int open (const char *file) {
   return fd.id;
 }
 
-int filesize(int fd UNUSED) {
-
-  // TODO
-  thread_exit();
+int filesize(int fd) {
+  struct file *f;
+  int retval = -1;
+  
+  f = get_file_descriptor(fd)->file;
+  if (f) {
+    lock_acquire(filesys_lock);
+    retval = file_length(f);
+    lock_release(filesys_lock);
+  }
+  
+  return retval;
 }
 
 int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
@@ -131,6 +139,9 @@ int read(int fd UNUSED, void *buffer UNUSED, unsigned size UNUSED) {
 }
 
 int write(int fd, const void *buffer, unsigned size) {
+  struct file *f;
+  int retval = -1;
+  
   // Check validity of buffer pointer
   if(buffer + size - 1 >= PHYS_BASE || get_user(buffer + size - 1) == -1) {
     exit(-1);
@@ -147,8 +158,15 @@ int write(int fd, const void *buffer, unsigned size) {
     putbuf( (char *)(buffer + offset), (size_t) (size - offset));
     return size;
   }
-
-  return 0;
+  
+  f = get_file_descriptor(fd)->file;
+  if (f) {
+    lock_acquire(filesys_lock);
+    retval = file_write(f, buffer, size);
+    lock_release(filesys_lock);
+  }
+  
+  return retval;
 }
 
 void seek(int fd UNUSED, unsigned position UNUSED) {
@@ -167,6 +185,22 @@ void close (int fd UNUSED) {
 
   // TODO
   thread_exit();
+}
+
+static struct file_desc *get_file_descriptor(int fd) {
+  struct list_elem *e;
+  
+  for (e = list_begin(&(thread_current()->file_descs)); 
+       e != list_end(&(thread_current()->file_descs));
+       e = list_next(e)) {
+  
+    struct file_desc *d = list_entry(e, struct file_desc, elem);
+    if (d->id = fd) {
+      return d;
+    }
+  }
+  
+  return NULL;
 }
 
 static void syscall_handler(struct intr_frame *f) {
