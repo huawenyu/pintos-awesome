@@ -49,7 +49,7 @@ void exit(int status) {
     l = list_begin(&(curr->file_descs));
     fd = list_entry(l, struct file_desc, elem);
     /* This should remove the fd from the fd list. */
-    close(fd);
+    close(fd->id);
   }
   //TODO: Update parent's child thread status list
   thread_exit();
@@ -208,7 +208,7 @@ void close (int fd) {
     lock_release(filesys_lock);
   }
   
-  list_remove(&(thread_current()->file_descs), d);
+  list_remove(d);
 }
 
 static struct file_desc *get_file_descriptor(int fd) {
