@@ -29,12 +29,12 @@ void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
 
-static struct lock *filesys_lock;
+static struct lock filesys_lock;
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
   
-  lock_init(filesys_lock);
+  lock_init(&filesys_lock);
 }
 
 void halt(void) {
@@ -78,9 +78,9 @@ bool create(const char *file, unsigned initial_size) {
       return -1;
   }
   
-  lock_acquire(filesys_lock);
+  lock_acquire(&filesys_lock);
   retval = filesys_create(file, initial_size);
-  lock_release(filesys_lock);
+  lock_release(&filesys_lock);
   return retval;
 }
 
@@ -93,9 +93,9 @@ bool remove(const char *file) {
       return -1;
   }
   
-  lock_acquire(filesys_lock);
+  lock_acquire(&filesys_lock);
   retval = filesys_remove(file);
-  lock_release(filesys_lock);
+  lock_release(&filesys_lock);
   return retval;
 }
 
@@ -109,13 +109,13 @@ int open (const char *file) {
       return -1;
   }
   
-  lock_acquire(filesys_lock);
+  lock_acquire(&filesys_lock);
   f = filesys_open(file);
   if (!f) {
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
     return -1;
   }
-  lock_release(filesys_lock);
+  lock_release(&filesys_lock);
   
   fd.file = f;
   if (list_empty(&(thread_current()->file_descs))) {
@@ -135,9 +135,9 @@ int filesize(int fd) {
   int retval = -1;
   
   if (d && d->file) {
-    lock_acquire(filesys_lock);
+    lock_acquire(&filesys_lock);
     retval = file_length(d->file);
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -171,9 +171,9 @@ int write(int fd, const void *buffer, unsigned size) {
   
   struct file_desc *d = get_file_descriptor(fd);
   if (d && d->file) {
-    lock_acquire(filesys_lock);
+    lock_acquire(&filesys_lock);
     retval = file_write(d->file, buffer, size);
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -183,9 +183,9 @@ void seek(int fd, unsigned position) {
   struct file_desc *d = get_file_descriptor(fd);
   
   if (d && d->file) {
-    lock_acquire(filesys_lock);
+    lock_acquire(&filesys_lock);
     file_seek(d->file, position);
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
   }
 }
 
@@ -194,9 +194,9 @@ unsigned tell(int fd) {
   int retval = -1;
   
   if (d && d->file) {
-    lock_acquire(filesys_lock);
+    lock_acquire(&filesys_lock);
     retval = file_tell(d->file);
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -205,9 +205,9 @@ unsigned tell(int fd) {
 void close (int fd) {
   struct file_desc *d = get_file_descriptor(fd);
   if (d && d->file) {
-    lock_acquire(filesys_lock);
+    lock_acquire(&filesys_lock);
     file_close(d->file);
-    lock_release(filesys_lock);
+    lock_release(&filesys_lock);
   }
   
   list_remove(d);
