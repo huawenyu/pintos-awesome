@@ -53,6 +53,9 @@ tid_t process_execute(const char *file_name) {
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(pname, PRI_DEFAULT, start_process, fn_copy);
     
+    struct file *f = filesys_open(pname);
+    file_deny_write(f);
+    
     child->pid = tid;
     child->exited = false;
     child->waiting = false;
@@ -61,6 +64,9 @@ tid_t process_execute(const char *file_name) {
     // Update child thread to know parent thread
     child_t = get_thread_from_tid(tid);
     child_t->parent_pid = curr->tid;
+    child_t->executable = f;
+    
+    palloc_free_page(fn_copy2);
     
     if (tid == TID_ERROR)
         palloc_free_page(fn_copy); 
@@ -136,7 +142,9 @@ int process_wait(tid_t child_tid) {
   if (child->exited) {
     /* If it's done, remove it from the child list and return its exit status. */
     list_remove(&(child->elem));
-    return child->exit_status;
+    int retval = child->exit_status;
+    palloc_free_page(child);
+    return retval;
   }
   else {
     intr_disable ();

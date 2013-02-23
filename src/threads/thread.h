@@ -132,6 +132,7 @@ struct thread {
     /*! Owned by userprog/process.c. */
     /**@{*/
     tid_t parent_pid;
+    struct file *executable;
     struct list file_descs;
     struct list child_threads;
     uint32_t *pagedir;                  /*!< Page directory. */

@@ -53,6 +53,8 @@ void exit(int status) {
     /* This should remove the fd from the fd list. */
     close(fd->id);
   }
+  file_allow_write(curr->executable);
+  file_close(curr->executable);
   // Update parent, unblock if necessary
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
   for (e = list_begin(&(parent->child_threads));
@@ -252,6 +254,7 @@ void close (int fd) {
     lock_release(&filesys_lock);
     
     list_remove(&(d->elem));
+    palloc_free_page(d);
   }
 }
 
