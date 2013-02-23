@@ -17,9 +17,12 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
+
+static struct semaphore lock_sema;
 
 /*! Starts a new thread running a user program loaded from FILENAME.  The new
     thread may be scheduled (and may even exit) before process_execute()
@@ -49,11 +52,24 @@ tid_t process_execute(const char *file_name) {
 
     char *unused;
     char *pname = strtok_r(fn_copy2, " ", &unused);
+    
+    sema_init(&lock_sema, 1);
+    sema_down(&lock_sema);
 
     /* Create a new thread to execute FILE_NAME. */
     tid = thread_create(pname, PRI_DEFAULT, start_process, fn_copy);
     
+    sema_down(&lock_sema);
+    sema_up(&lock_sema);
+
+    child_t = get_thread_from_tid(tid);
+    thread_unblock(child_t);
+    if (!child_t->load_success) {
+      return -1;
+    }
+    
     struct file *f = filesys_open(pname);
+    if (!f) return -1;
     file_deny_write(f);
     
     child->pid = tid;
@@ -62,7 +78,6 @@ tid_t process_execute(const char *file_name) {
     child->exit_status = -1;
     list_push_back(&(curr->child_threads), &(child->elem));
     // Update child thread to know parent thread
-    child_t = get_thread_from_tid(tid);
     child_t->parent_pid = curr->tid;
     child_t->executable = f;
     
@@ -85,13 +100,20 @@ static void start_process(void *file_name_) {
     if_.cs = SEL_UCSEG;
     if_.eflags = FLAG_IF | FLAG_MBS;
     success = load(file_name, &if_.eip, &if_.esp);
+    
+    thread_current()->load_success = success;
+    sema_up(&lock_sema);
+    intr_disable ();
+    thread_block ();
+    intr_enable ();
 
     palloc_free_page(0);
 
     /* If load failed, quit. */
     palloc_free_page(file_name);
-    if (!success) 
+    if (!success) {
         thread_exit();
+    }
 
     /* Start the user process by simulating a return from an
        interrupt, implemented by intr_exit (in

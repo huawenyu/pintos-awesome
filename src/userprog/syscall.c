@@ -53,8 +53,10 @@ void exit(int status) {
     /* This should remove the fd from the fd list. */
     close(fd->id);
   }
-  file_allow_write(curr->executable);
-  file_close(curr->executable);
+  if (curr->executable) {
+    file_allow_write(curr->executable);
+    file_close(curr->executable);
+  }
   // Update parent, unblock if necessary
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
   for (e = list_begin(&(parent->child_threads));
@@ -77,8 +79,7 @@ pid_t exec(const char *cmd_line) {
       exit(-1);
       return -1;
   }
-
-  // TODO: Add synchronization somewhere
+  
   lock_acquire(&filesys_lock);
   child_tid = process_execute(cmd_line);
   lock_release(&filesys_lock);
