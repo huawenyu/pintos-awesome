@@ -45,6 +45,7 @@ void exit(int status) {
   printf("%s: exit(%d)\n", thread_current()->name, status);
   struct thread *curr = thread_current();
   struct file_desc *fd;
+  struct child_thread *ct;
   struct list_elem *l;
   struct list_elem *e;
   while (!list_empty(&(curr->file_descs))) {
@@ -57,6 +58,18 @@ void exit(int status) {
     file_allow_write(curr->executable);
     file_close(curr->executable);
   }
+  
+  // Update children
+  while (!list_empty(&(curr->child_threads))) {
+    l = list_begin(&(curr->child_threads));
+    ct = list_entry(l, struct child_thread, elem);
+    /* Orphans! */
+    struct thread *orphan = get_thread_from_tid(ct->pid);
+    orphan->parent_pid = 1; //main pid
+    list_remove(&(ct->elem));
+    palloc_free_page(ct);
+  }
+  
   // Update parent, unblock if necessary
   struct thread *parent = get_thread_from_tid(curr->parent_pid);
   for (e = list_begin(&(parent->child_threads));
