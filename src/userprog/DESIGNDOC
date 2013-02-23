@@ -8,16 +8,16 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Atharv Vaish <avaish@caltech.edu>
+Dan Chen <dychen@caltech.edu>
+Ilya Nepomnyashchiy <ilyanep@caltech.edu>
 
->> Specify how many late tokens you are using on this assignment:  
+>> Specify how many late tokens you are using on this assignment: 2 
 
 >> What is the Git repository and commit hash for your submission?
 
-   Repository URL:  
-   commit ...
+   Repository URL:  https://github.com/ilyanep/pintos-awesome.git
+   commit 
 
 ---- PRELIMINARIES ----
 
@@ -37,19 +37,46 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+None.
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+First, I modify the string in place to get rid of any excess whitespace. Then, I
+parse the string and copy the offsets from the start of the string of each 
+argument into an array. The number of strtok_r() calls also gives me argc. Then,
+I backwards through that array to get the address and length of each argument 
+and push those onto the stack (in reverse order) while decrementing $esp. While 
+I'm doing this, I store the address of $esp for every argument into another 
+array ($esp should point to the beginning of each argument on the stack as it 
+gets pushed onto the stack). Then, I word-align $esp, push the addresses of all 
+of the arguments (in reverse order, again) using my argument address list, push 
+argc, and then push a fake return value, all while decrementing $esp 
+accordingly. The elements of argv[] are pushed onto the stack in reverse order, 
+which is what is expected. I avoid overflowing by checking to make sure the 
+argument string isn't too long.
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
+The kernel needs to be reentrant. Therefore, it implements strtok_r(), which is
+a reentrant version of strtok().
+
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
+One advantage is that the kernel code becomes a lot simpler. Since the shell is
+a system application, the separation of the name and arguments is done outside
+the kernel and therefore reduces the number of potential bugs in the kernel.
+
+Another advantage of the Unix approach is that the shell abstracts away the
+stack setup onto the kernel in a consistent manner, rather than the kernel
+having to do it all by itself.
 
                              SYSTEM CALLS
                              ============
@@ -60,9 +87,39 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct child_thread {
+    tid_t pid;  // thread pid
+    int exit_status;  // exit status (used by wait)
+    bool exited;   // is the thread running?
+    bool waiting;  // are we waiting on the child?
+    struct list_elem elem;
+};
+This is used within struct thread to hold information about child threads.
+
+struct file_desc {
+    int id;  // file descriptor
+    struct list_elem elem;  
+    struct file *file;  // file
+};
+This is used within struct thread to hold information about open files.
+
+struct thread {
+    tid_t parent_pid;  // parent process pid
+    int load_success;  // did the executable load?
+    struct file *executable; // executable file
+    struct list file_descs;  // file descriptor list
+    struct list child_threads;  // child thread list
+};
+These were added to struct thread to hold user process related information.
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+File descriptors are created when a file is open. Each file descriptor is unique
+only within a single process. When the file is closed, the file descriptor is 
+also removed. The file_desc struct maps the integer file descriptor to the open
+file. The process maintains a list of file_desc structs.
 
 ---- ALGORITHMS ----
 
@@ -78,6 +135,16 @@ FirstName LastName <email@domain.example>
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+The wait system call gets a pid. It then looks through its list of child 
+processes for that PID. If it doesn't find it, it returns -1. Otherwise, it 
+checks to see if the child has finished running. If it has, then wait simply
+returns the exit status of the child and removes the child thread from its list
+of child threads. Otherwise, it sets the waiting bit and blocks.
+
+When the child thread in question finishes, it looks at the parent thread and
+updates the exit status. If the waiting bit is set, the child thread also
+unblocks the parent thread so the parent can now see the exit status and return.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -100,12 +167,28 @@ FirstName LastName <email@domain.example>
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
+When process_execute runs (from being called from exec), it creates a semaphore
+with a value of 1 and decrements it. It then starts the child process and tries
+to decrement again. Of course, this gets blocked until the semaphore gets
+incremented, and that only happens after load() has been called on the new 
+executable. This ensures that exec does not return until load() has been
+executed. The child thread then blocks to allow the parent thread to inspect the
+child thread's load_status.
+
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
 >> calls wait(C) before C exits?  After C exits?  How do you ensure
 >> that all resources are freed in each case?  How about when P
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
+
+If P calls wait(C) before C exits, it blocks until C exits and unblocks P. C's
+thread is freed by the kernel, and C's data in P is freed by P. If P calls 
+wait(C) after C exits, C has already updated P's thread with its exit details so
+P can just access them and free them when it calls wait. C's thread has already
+been freed by the kernel. If P exits before C exits, P updates C's parent PID so
+it points to main (C gets orphaned). If P exits after C exits, P effectively
+just frees all its information about C.
 
 ---- RATIONALE ----
 
@@ -115,8 +198,18 @@ FirstName LastName <email@domain.example>
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+We use a simple file descriptor list, which means that if a process has a lot of
+files open it becomes somewhat time consuming to locate the file descriptor.
+However, the mapping between ints and file structs is intuitive and simple, so 
+working with the file descriptors essentially was not complicated at all. A
+helper function that obtained the file_desc struct from file descriptor number
+was created to help make operations simpler.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+We did not change the identity mapping. Why change something when it seems to 
+work just fine?
 
                            SURVEY QUESTIONS
                            ================

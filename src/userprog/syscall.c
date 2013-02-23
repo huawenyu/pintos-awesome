@@ -64,8 +64,10 @@ void exit(int status) {
     l = list_begin(&(curr->child_threads));
     ct = list_entry(l, struct child_thread, elem);
     /* Orphans! */
-    struct thread *orphan = get_thread_from_tid(ct->pid);
-    orphan->parent_pid = 1; //main pid
+    if (!ct->exited) {
+      struct thread *orphan = get_thread_from_tid(ct->pid);
+      orphan->parent_pid = 1; //main pid
+    }
     list_remove(&(ct->elem));
     palloc_free_page(ct);
   }
