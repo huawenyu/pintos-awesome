@@ -16,7 +16,6 @@ static int get_user(const uint8_t *);
 static bool put_user(uint8_t *, uint8_t);
 static struct file_desc *get_file_descriptor(int fd);
 void halt(void);
-void exit(int);
 pid_t exec(const char*);
 int wait(pid_t);
 bool create(const char*, unsigned);
@@ -84,6 +83,15 @@ void exit(int status) {
       if (ct->waiting) thread_unblock(parent);
     }
   }
+
+  // Release all locks
+  for (e = list_begin(&(curr->locks));
+       e != list_end(&(curr->locks));
+       e = list_next(e)) {
+    struct lock *curr_lock = list_entry(e, struct lock, lockelem);
+    lock_release(curr_lock);
+  }
+
   thread_exit();
 }
 
