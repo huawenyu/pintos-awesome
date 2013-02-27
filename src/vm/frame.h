@@ -4,7 +4,7 @@
 #include "threads/thread.h"
 
 struct vm_frame {
-  void *page;
+  void *page; // The kernel address for the frame
   tid_t tid;
   struct list_elem elem;
 

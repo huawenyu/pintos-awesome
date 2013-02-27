@@ -40,6 +40,7 @@
 #ifdef VM
 
 #include "vm/frame.h"
+#include "vm/page.h"
 
 #endif
 
@@ -129,6 +130,7 @@ int main(void) {
 
 #ifdef VM
     vm_frame_init();
+    vm_init_spt();
 #endif
 
     /* Start thread scheduler and enable interrupts. */

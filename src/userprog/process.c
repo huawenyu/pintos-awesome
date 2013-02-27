@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char *cmdline, void (**eip)(void), void **esp);
@@ -135,7 +136,6 @@ static void start_process(void *file_name_) {
     This function will be implemented in problem 2-2.  For now, it does
     nothing. */
 int process_wait(tid_t child_tid) {
-  // TODO: Real implementation
   struct thread *curr = thread_current();
   struct list_elem *e = list_begin(&(curr->child_threads));
   struct child_thread *child;
@@ -182,6 +182,9 @@ int process_wait(tid_t child_tid) {
 void process_exit(void) {
     struct thread *cur = thread_current();
     uint32_t *pd;
+
+    // Destroy the current process's supplemental page directory
+    vm_free_spt();
 
     /* Destroy the current process's page directory and switch back
        to the kernel-only page directory. */
@@ -297,6 +300,7 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     t->pagedir = pagedir_create();
     if (t->pagedir == NULL) 
         goto done;
+    hash_init(&(t->supp_pagedir), spte_hash, spte_less, NULL);
     process_activate();
 
     /* Open executable file. */
