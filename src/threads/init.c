@@ -37,6 +37,12 @@
 
 #endif
 
+#ifdef VM
+
+#include "vm/frame.h"
+
+#endif
+
 #ifdef FILESYS
 
 #include "devices/block.h"
@@ -121,10 +127,15 @@ int main(void) {
     syscall_init();
 #endif
 
+#ifdef VM
+    vm_frame_init();
+#endif
+
     /* Start thread scheduler and enable interrupts. */
     thread_start();
     serial_init_queue();
     timer_calibrate();
+
 
 #ifdef FILESYS
     /* Initialize file system. */
