@@ -361,7 +361,7 @@ static void syscall_handler(struct intr_frame *f) {
 // Terminates the thread with exit status 11 if there is a segfault
 // (including trying to read above PHYS_BASE. That's not yo memory!)
 static int get_four_bytes_user(const void * add) {
-  if(add > PHYS_BASE) { exit(-1); }
+  if(add >= PHYS_BASE) { exit(-1); }
   uint8_t *uaddr = (uint8_t *) add;
   int result = 0;
   int temp;
