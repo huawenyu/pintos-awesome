@@ -5,6 +5,7 @@
 
 struct vm_frame {
   void *page;
+  tid_t tid;
   struct list_elem elem;
 
   // TODO: add more data that is needed here

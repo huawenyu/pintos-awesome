@@ -66,6 +66,7 @@ static bool vm_add_frame(void *frame) {
   }
   
   v->page = frame;
+  v->tid = thread_current()->tid;
 
   // TODO populate data into v
 
