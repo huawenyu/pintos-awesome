@@ -146,6 +146,19 @@ static void page_fault(struct intr_frame *f) {
       return;
     }
 
+    /* To whoever implements the user virtual memory:
+
+       * If FS type:
+          - Read it back from the file and into memory (probably use read)
+       * If SWAP type:
+          - Swap back into memory (vm_swap_read)
+       * If ZERO type:
+          - Just memset the page to zero
+       * If MMAP type:
+          - Read from the file
+
+          */
+
     /* To implement virtual memory, delete the rest of the function
        body, and replace it with code that brings in the page to
        which fault_addr refers. */
