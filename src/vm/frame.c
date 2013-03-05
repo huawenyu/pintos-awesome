@@ -53,6 +53,20 @@ void vm_free_frame(void *frame) {
 }
 
 // Evict a frame.
+/* To whoever implements this:
+     * If a page is FS type:
+        - If dirty, change to swap type in vm_spte and swap out
+        - If not dirty, just remove from memory -- will read later
+     * If a page is SWAP type:
+        - Always swap out
+     * If a page is ZERO type:
+        - If dirty, change to swap type in vm_spte and swap out
+        - If not dirty, remove from memory -- will zero later
+     * If a page is MMAP type:
+        - If dirty, write back to file
+        - If not dirty, just remove from memory
+
+        */
 void *vm_evict_frame() {
   return NULL; // TODO
 }
