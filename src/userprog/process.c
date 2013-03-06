@@ -591,7 +591,10 @@ static bool setup_stack(void **esp) {
 
     kpage = vm_frame_alloc(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
-        success = install_page(((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+        uint8_t *upage;
+        upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+        success = install_page(upage, kpage, true);
+        success &= vm_install_swap_spte(upage, 0, true);
         if (success)
             *esp = PHYS_BASE;
         else
