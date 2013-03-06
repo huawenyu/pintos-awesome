@@ -75,6 +75,7 @@ void sema_down(struct semaphore *sema) {
     while (sema->value == 0) {
         /* Insert into the waiting list based on priority. 
          * Basically, the waiting list is now a priority queue. */
+        ASSERT(list_begin(&sema->waiters) != NULL);
         list_insert_ordered(&sema->waiters, &thread_current()->elem, 
                             thread_less_func, NULL);
         thread_block();

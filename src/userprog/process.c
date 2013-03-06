@@ -543,7 +543,6 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
     ASSERT(pg_ofs(upage) == 0);
     ASSERT(ofs % PGSIZE == 0);
 
-    file_seek(file, ofs);
     while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -551,33 +550,16 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        /* Get a page of memory. */
-        //uint8_t *kpage = vm_frame_alloc(PAL_USER, upage);
-        //if (kpage == NULL)
-        //    return false;
-
         /* Load this page. */
         if(!vm_install_fs_spte(upage, file, ofs, page_read_bytes, page_zero_bytes, 
                               writable)) {
           return false;
         }
 
-        // Old implementation (pre lazy loading)
-        //if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-        //    vm_free_frame(kpage);
-        //    return false;
-        //}
-        //memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-        /* Add the page to the process's address space. */
-        //if (!install_page(upage, kpage, writable)) {
-        //    vm_free_frame(kpage);
-        //    return false; 
-        //}
-
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
+        ofs += PGSIZE;
         upage += PGSIZE;
     }
     return true;

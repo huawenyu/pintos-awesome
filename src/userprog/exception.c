@@ -150,35 +150,45 @@ static void page_fault(struct intr_frame *f) {
       return;
     }
 
-    /* To whoever implements the user virtual memory:
+#ifdef DEBUG
+    printf("Page fault at %p: %s error %s page in %s context.\n",
+           fault_addr,
+           not_present ? "not present" : "rights violation",
+           write ? "writing" : "reading",
+           user ? "user" : "kernel");
+#endif
 
-       * If FS type:
-          - Read it back from the file and into memory (probably use read)
-       * If SWAP type:
-          - Swap back into memory (vm_swap_read)
-       * If ZERO type:
-          - Just memset the page to zero
-       * If MMAP type:
-          - Read from the file
+    if(fault_addr == 0) {
+      printf("Fault address in NULL!!!!\n");
+      goto failed;
+    }
 
-          */
     // Currently not handling rights violations
     if(not_present) {
+      // Get the address of the actual page.
+      fault_addr = fault_addr - (void *)(((int)fault_addr) % PGSIZE);
       struct thread *t = thread_current();
       struct vm_spte *v = vm_lookup_spte(fault_addr);
+      if(v == NULL) {
+        goto failed;
+      }
       void *kpage; 
       kpage = vm_frame_alloc(PAL_USER, fault_addr);
+      if(kpage == NULL) {
+        goto failed;
+      }
       if( !pagedir_set_page(t->pagedir, fault_addr, kpage, v->writable) ) {
         goto failed;
       }
       switch(v->type) {
         case SPTE_FS:
-          lock_acquire(&filesys_lock);
-          if(file_read(v->file, kpage, v->read_bytes) != v->read_bytes) {
+          //lock_acquire(&filesys_lock);
+          if(file_read_at(v->file, kpage, v->read_bytes, v->offset) 
+              != v->read_bytes) {
             goto failed;
           }
           memset(kpage + v->read_bytes, 0, v->zero_bytes);
-          lock_release(&filesys_lock);
+          //lock_release(&filesys_lock);
           break;
         case SPTE_SWAP:
           vm_swap_read(v->swap_page, fault_addr);
@@ -188,7 +198,8 @@ static void page_fault(struct intr_frame *f) {
           break;
         case SPTE_MMAP:
           lock_acquire(&filesys_lock);
-          if(file_read(v->file, kpage, v->read_bytes) != v->read_bytes) {
+          if(file_read_at(v->file, kpage, v->read_bytes, v->offset) 
+              != v->read_bytes) {
             goto failed;
           }
           memset(kpage + v->read_bytes, 0, v->zero_bytes);
@@ -196,18 +207,12 @@ static void page_fault(struct intr_frame *f) {
           break;
       } 
         pagedir_set_dirty(t->pagedir, fault_addr, false);
+        return;
     }
 
 failed:
 
-    /* To implement virtual memory, delete the rest of the function
-       body, and replace it with code that brings in the page to
-       which fault_addr refers. */
-    printf("Page fault at %p: %s error %s page in %s context.\n",
-           fault_addr,
-           not_present ? "not present" : "rights violation",
-           write ? "writing" : "reading",
-           user ? "user" : "kernel");
+    printf("Failed to deal with page fault! Killing thread\n");
     kill(f);
 }
 
