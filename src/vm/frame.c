@@ -60,11 +60,11 @@ void vm_free_tid_frames(tid_t tid) {
   e = list_head(&vm_frames_list);
   while(e != list_tail(&vm_frames_list)) {
     v = list_entry(e, struct vm_frame, elem);
-    e = list_next(e);
     if(v->tid == tid) {
       list_remove(e);
       free(v);
     }
+    e = list_next(e);
   }
   lock_release(&vm_lock);
 }
