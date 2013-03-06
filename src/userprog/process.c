@@ -557,7 +557,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         //    return false;
 
         /* Load this page. */
-        if(!vm_install_fs_spte(upage, file, ofs, read_bytes, zero_bytes, 
+        if(!vm_install_fs_spte(upage, file, ofs, page_read_bytes, page_zero_bytes, 
                               writable)) {
           return false;
         }
