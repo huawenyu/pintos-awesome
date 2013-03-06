@@ -182,13 +182,13 @@ static void page_fault(struct intr_frame *f) {
       }
       switch(v->type) {
         case SPTE_FS:
-          //lock_acquire(&filesys_lock);
+          lock_acquire(&filesys_lock);
           if(file_read_at(v->file, kpage, v->read_bytes, v->offset) 
               != v->read_bytes) {
             goto failed;
           }
           memset(kpage + v->read_bytes, 0, v->zero_bytes);
-          //lock_release(&filesys_lock);
+          lock_release(&filesys_lock);
           break;
         case SPTE_SWAP:
           vm_swap_read(v->swap_page, fault_addr);

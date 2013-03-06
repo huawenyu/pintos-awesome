@@ -42,7 +42,7 @@ void *vm_frame_alloc(enum palloc_flags flags, void *uaddr) {
     PANIC("Could not allocate a user frame");
   }
   
-  frame->done = false;
+  vm_get_frame(frame)->done = false;
 
   return frame;
 }
