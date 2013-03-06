@@ -52,6 +52,26 @@ void vm_free_frame(void *frame) {
   palloc_free_page(frame);
 }
 
+// Free all frames owned by a tid.
+void vm_free_tid_frames(tid_t tid) {
+  struct vm_frame *v;
+  struct list_elem *e;
+
+  lock_acquire(&vm_lock);
+  e = list_head(&vm_frames_list);
+  while(e != list_tail(&vm_frames_list)) {
+    v = list_entry(e, struct vm_frame, elem);
+    e = list_next(e);
+    if(v->tid == tid) {
+      list_remove(e);
+      free(v);
+    }
+  }
+  lock_release(&vm_lock);
+
+  return v;
+}
+
 // Evict a frame.
 /* To whoever implements this:
      * If a page is FS type:

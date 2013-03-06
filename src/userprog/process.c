@@ -184,7 +184,9 @@ void process_exit(void) {
     uint32_t *pd;
 
     // Destroy the current process's supplemental page directory
+    // and free its frames.
     vm_free_spt();
+    vm_free_tid_frames(cur->tid);
 
     /* Destroy the current process's page directory and switch back
        to the kernel-only page directory. */

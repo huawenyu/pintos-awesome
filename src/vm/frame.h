@@ -16,6 +16,7 @@ struct list vm_frames_list;
 void vm_frame_init(void);
 void *vm_frame_alloc(enum palloc_flags flags);
 void vm_free_frame(void *);
+void vm_free_tid_frames(tid_t);
 
 void *vm_evict_frame(void);
 
