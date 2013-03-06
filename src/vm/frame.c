@@ -7,6 +7,9 @@
 #include "userprog/pagedir.h"
 
 #include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
+#include "filesys/file.h"
 
 // Ensure synchronization on VM operations
 static struct lock vm_lock;
@@ -93,7 +96,50 @@ void vm_free_tid_frames(tid_t tid) {
 
         */
 void *vm_evict_frame() {
-  return NULL; // TODO
+  /* The list vm_frames_list should never be empty when this function
+   * is called. */
+  struct vm_frame *evicted;
+  struct thread *evicted_thread;
+  void *evicted_page;
+  struct vm_spte *evicted_spte;
+  bool dirty;
+
+  ASSERT(!list_empty(&vm_frames_list));
+  /* Choose a frame to evict. */
+  lock_acquire(&vm_lock);
+  evicted = list_entry(list_pop_front(&vm_frames_list), struct vm_frame, elem);
+  lock_release(&vm_lock);
+  evicted_thread = get_thread_from_tid(evicted->tid);
+  evicted_page = evicted->uaddr;
+  /* Remove references to the frame. */
+  pagedir_clear_page(evicted_thread->pagedir, evicted_page);
+  /* Write the page to the file system or to swap, if necessary. */
+  dirty = pagedir_is_dirty(evicted_thread->pagedir, evicted_page);
+  if (evicted_spte->type == SPTE_FS) {
+    if (dirty) {
+      evicted_spte->type = SPTE_SWAP;
+      vm_swap_write(evicted_page);
+    }
+  }
+  else if (evicted_spte->type == SPTE_SWAP) {
+    vm_swap_write(evicted_page);
+  }
+  else if (evicted_spte->type == SPTE_ZERO) {
+    if (dirty) {
+      evicted_spte->type = SPTE_SWAP;
+      vm_swap_write(evicted_page);
+    }
+  }
+  else if (evicted_spte->type == SPTE_MMAP) {
+    if (dirty) {
+      lock_acquire(&filesys_lock);
+      file_write_at(evicted_spte->file, evicted_page,
+                    evicted_spte->read_bytes, evicted_spte->offset);
+      lock_release(&filesys_lock);
+    }
+  }
+
+  return evicted->page;
 }
 
 // Add the frame to the frame table
