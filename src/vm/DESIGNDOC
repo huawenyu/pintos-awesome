@@ -145,10 +145,15 @@ Anything that involves the frame table is wrapped in a vm lock.
 >> the page during the eviction process?  How do you avoid a race
 >> between P evicting Q's frame and Q faulting the page back in?
 
+
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
 >> cannot interfere by e.g. attempting to evict the frame while it is
 >> still being read in?
+
+Each frame table entry has a member named 'done' which indicates whether
+data is done being read into the frame. If it is false, it is never
+evicted.
 
 >> B8: Explain how you handle access to paged-out pages that occur
 >> during system calls.  Do you use page faults to bring in pages (as

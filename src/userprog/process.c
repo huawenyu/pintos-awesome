@@ -577,6 +577,7 @@ static bool setup_stack(void **esp) {
     if (kpage != NULL) {
         success = install_page(upage, kpage, true);
         success &= vm_install_swap_spte(upage, 0, true);
+        vm_frame_set_done(kpage, true);
         if (success)
             *esp = PHYS_BASE;
         else

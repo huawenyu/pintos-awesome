@@ -206,6 +206,7 @@ static void page_fault(struct intr_frame *f) {
           lock_release(&filesys_lock);
           break;
       } 
+        vm_frame_set_done(kpage, true);
         pagedir_set_dirty(t->pagedir, fault_addr, false);
         return;
     }

@@ -41,8 +41,16 @@ void *vm_frame_alloc(enum palloc_flags flags, void *uaddr) {
   else if( (frame = vm_evict_frame()) == NULL ) {
     PANIC("Could not allocate a user frame");
   }
+  
+  frame->done = false;
 
   return frame;
+}
+
+void vm_frame_set_done(void *frame, bool val) {
+  struct vm_frame *v;
+  v = vm_get_frame(frame);
+  v->done = val;
 }
 
 // Frees the frame and removes it from the frame table
