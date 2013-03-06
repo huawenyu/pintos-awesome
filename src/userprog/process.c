@@ -302,6 +302,7 @@ bool load(const char *file_name, void (**eip) (void), void **esp) {
     t->pagedir = pagedir_create();
     if (t->pagedir == NULL) 
         goto done;
+    // Also create the supplemental pagedir
     hash_init(&(t->supp_pagedir), spte_hash, spte_less, NULL);
     process_activate();
 
@@ -551,22 +552,28 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* Get a page of memory. */
-        uint8_t *kpage = vm_frame_alloc(PAL_USER);
-        if (kpage == NULL)
-            return false;
+        //uint8_t *kpage = vm_frame_alloc(PAL_USER);
+        //if (kpage == NULL)
+        //    return false;
 
         /* Load this page. */
-        if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
-            palloc_free_page(kpage);
-            return false;
+        if(!vm_install_fs_spte(upage, file, ofs, read_bytes, zero_bytes, 
+                              writable)) {
+          return false;
         }
-        memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+        // Old implementation (pre lazy loading)
+        //if (file_read(file, kpage, page_read_bytes) != (int) page_read_bytes) {
+        //    vm_free_frame(kpage);
+        //    return false;
+        //}
+        //memset(kpage + page_read_bytes, 0, page_zero_bytes);
 
         /* Add the page to the process's address space. */
-        if (!install_page(upage, kpage, writable)) {
-            vm_free_frame(kpage);
-            return false; 
-        }
+        //if (!install_page(upage, kpage, writable)) {
+        //    vm_free_frame(kpage);
+        //    return false; 
+        //}
 
         /* Advance. */
         read_bytes -= page_read_bytes;
