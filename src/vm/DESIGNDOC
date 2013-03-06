@@ -37,6 +37,40 @@ Atharv Vaish <avaish@caltech.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+enum vm_spt_type {
+  SPTE_FS = 001,  // On the file system
+  SPTE_SWAP = 002, // In swap 
+  SPTE_ZERO = 003, // All zeroes 
+  SPTE_MMAP = 004 // Mmapped file
+};
+
+^ Denotes the possible types of virtual pages.
+
+struct vm_spte {
+  void *uaddr; // Only here to act as a key
+  bool writable; // Just so much easier to keep track of here 
+  enum vm_spt_type type;
+  int access_vector; // Currently unused
+
+  // Used iff of type SPTE_FS or SPTE_MMAP
+  struct file *file;
+  off_t offset;
+
+  // used iff of type SPTE_FS
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+  
+  // used iff of type SPTE_SWAP
+  int swap_page;
+
+  struct hash_elem elem;
+
+  // TODO: add more data as needed here
+};
+
+^ Includes a bunch of information that might need to be had when 
+faulting in a page.
+
 ---- ALGORITHMS ----
 
 >> A2: In a few paragraphs, describe your code for locating the frame,
@@ -78,6 +112,9 @@ I used a list for the SPT because it was the easiest to work with.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+I uh...do you mean the swap.h stuff? I don't even understand this 
+question.
+
 ---- ALGORITHMS ----
 
 >> B2: When a frame is required but none is free, some frame must be
@@ -86,6 +123,9 @@ I used a list for the SPT because it was the easiest to work with.
 >> B3: When a process P obtains a frame that was previously used by a
 >> process Q, how do you adjust the page table (and any other data
 >> structures) to reflect the frame Q no longer has?
+
+We remove the frame from Q's page directory and that's pretty much all
+we need to do, aside from updating the frame table entry.
 
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
@@ -97,6 +137,8 @@ I used a list for the SPT because it was the easiest to work with.
 >> particular, explain how it prevents deadlock.  (Refer to the
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
+
+Anything that involves the frame table is wrapped in a vm lock.
 
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
