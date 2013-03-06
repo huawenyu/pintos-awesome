@@ -552,7 +552,7 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* Get a page of memory. */
-        //uint8_t *kpage = vm_frame_alloc(PAL_USER);
+        //uint8_t *kpage = vm_frame_alloc(PAL_USER, upage);
         //if (kpage == NULL)
         //    return false;
 
@@ -589,10 +589,10 @@ static bool setup_stack(void **esp) {
     uint8_t *kpage;
     bool success = false;
 
-    kpage = vm_frame_alloc(PAL_USER | PAL_ZERO);
+    uint8_t *upage;
+    upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+    kpage = vm_frame_alloc(PAL_USER | PAL_ZERO, upage);
     if (kpage != NULL) {
-        uint8_t *upage;
-        upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
         success = install_page(upage, kpage, true);
         success &= vm_install_swap_spte(upage, 0, true);
         if (success)

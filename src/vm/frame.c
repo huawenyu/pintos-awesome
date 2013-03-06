@@ -13,7 +13,7 @@
 static struct lock vm_lock;
 
 // Add and remove frames from the frames list
-static bool vm_add_frame(void *);
+static bool vm_add_frame(void *, void *);
 static void vm_remove_frame(void *);
 
 // Get the frame that corresponds to said page
@@ -26,7 +26,7 @@ void vm_frame_init() {
 }
 
 // Attempt to allocate a frame.
-void *vm_frame_alloc(enum palloc_flags flags) {
+void *vm_frame_alloc(enum palloc_flags flags, void *uaddr) {
   void *frame = NULL;
 
   // Should never be called on kernel space.
@@ -37,7 +37,7 @@ void *vm_frame_alloc(enum palloc_flags flags) {
   // Success means we got a frame -- add it to the table.
   // Failure means none available -- need to evict
   if(frame != NULL) {
-    vm_add_frame(frame);
+    vm_add_frame(frame, uaddr);
   }
   else if( (frame = vm_evict_frame()) == NULL ) {
     PANIC("Could not allocate a user frame");
@@ -68,8 +68,6 @@ void vm_free_tid_frames(tid_t tid) {
     }
   }
   lock_release(&vm_lock);
-
-  return v;
 }
 
 // Evict a frame.
@@ -92,7 +90,7 @@ void *vm_evict_frame() {
 }
 
 // Add the frame to the frame table
-static bool vm_add_frame(void *frame) {
+static bool vm_add_frame(void *frame, void *uaddr) {
   struct vm_frame *v;
   v = malloc(sizeof(struct vm_frame));
   if (v == NULL) {
@@ -101,6 +99,7 @@ static bool vm_add_frame(void *frame) {
   
   v->page = frame;
   v->tid = thread_current()->tid;
+  v->uaddr = uaddr;
 
   // TODO populate data into v
 

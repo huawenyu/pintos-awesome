@@ -7,6 +7,7 @@ struct vm_frame {
   void *page; // The kernel address for the frame
   tid_t tid;
   struct list_elem elem;
+  void *uaddr;
 
   // TODO: add more data that is needed here
 };
@@ -14,7 +15,7 @@ struct vm_frame {
 struct list vm_frames_list;
 
 void vm_frame_init(void);
-void *vm_frame_alloc(enum palloc_flags flags);
+void *vm_frame_alloc(enum palloc_flags flags, void *);
 void vm_free_frame(void *);
 void vm_free_tid_frames(tid_t);
 
