@@ -2,6 +2,7 @@
 #define VM_FRAME_H
 
 #include "threads/thread.h"
+#include "threads/palloc.h"
 
 struct vm_frame {
   void *page; // The kernel address for the frame

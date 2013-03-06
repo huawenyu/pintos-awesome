@@ -4,7 +4,11 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
 
 /*! Number of page faults processed. */
 static long long page_fault_cnt;
@@ -158,6 +162,43 @@ static void page_fault(struct intr_frame *f) {
           - Read from the file
 
           */
+    // Currently not handling rights violations
+    if(not_present) {
+      struct thread *t = thread_current();
+      struct vm_spte *v = vm_lookup_spte(fault_addr);
+      void *kpage; 
+      kpage = vm_frame_alloc(PAL_USER, fault_addr);
+      if( !pagedir_set_page(t->pagedir, fault_addr, kpage, v->writable) ) {
+        goto failed;
+      }
+      switch(v->type) {
+        case SPTE_FS:
+          lock_acquire(&filesys_lock);
+          if(file_read(v->file, kpage, v->read_bytes) != v->read_bytes) {
+            goto failed;
+          }
+          memset(kpage + v->read_bytes, 0, v->zero_bytes);
+          lock_release(&filesys_lock);
+          break;
+        case SPTE_SWAP:
+          vm_swap_read(v->swap_page, fault_addr);
+          break;
+        case SPTE_ZERO:
+          memset(fault_addr, 0, PGSIZE);
+          break;
+        case SPTE_MMAP:
+          lock_acquire(&filesys_lock);
+          if(file_read(v->file, kpage, v->read_bytes) != v->read_bytes) {
+            goto failed;
+          }
+          memset(kpage + v->read_bytes, 0, v->zero_bytes);
+          lock_release(&filesys_lock);
+          break;
+      } 
+        pagedir_set_dirty(t->pagedir, fault_addr, false);
+    }
+
+failed:
 
     /* To implement virtual memory, delete the rest of the function
        body, and replace it with code that brings in the page to
