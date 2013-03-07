@@ -202,6 +202,49 @@ static void page_fault(struct intr_frame *f) {
         pagedir_set_dirty(t->pagedir, fault_addr, false);
         return;
     }
+    // +1. Get the current esp
+    // +2. Detect if there is invalid stack access
+    // +   - If the page fault is 4 bytes below esp, we need to allocate a new page
+    // +   - If the page fault is 32 bytes below esp, we need to allocate a new page
+    // +3. Detect page faults in the kernel
+    // +   - Modify the thread struct to include esp
+    // -   - Save esp into the thread struct on the initial transition from user to kernel mode
+    // +4. Impose a 8MB limit on the stack size
+    // +5. Make sure the first page is not loaded lazily
+    // +6. Make sure all stack pages are candidates for eviction
+    // +   - An evicted stack page should be written to swap
+    /* Handle rights violations. Check for stack growth here. */
+    else {
+      void *esp;
+      void *upage;
+      void *kpage;
+      bool success;
+      if (user) {
+        esp = f->esp;
+      }
+      else {
+        esp = thread_current()->esp;
+      }
+      /* If there's an invalid access, check to see if it's a stack access. */
+      if (esp - 4 == fault_addr || esp - 32 == fault_addr || !user) {
+        /* Check to make sure the stack isn't too big. */
+        if (((uint32_t *) PHYS_BASE) - ((uint32_t *)fault_addr) > MAX_STACK_SIZE) {
+          goto failed;
+        }
+        upage = esp;
+        kpage = vm_frame_alloc(PAL_USER | PAL_ZERO, upage);
+        if(kpage == NULL) {
+          goto failed;
+        }
+        success = pagedir_set_page(thread_current()->pagedir, upage, kpage, true);
+        success &= vm_install_swap_spte(upage, 0, true);
+        vm_frame_set_done(kpage, true);
+        if (!success) {
+          goto failed;
+        }
+        return;
+      }
+    }
 
 failed:
 
