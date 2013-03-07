@@ -27,6 +27,9 @@ struct vm_spte {
   // used iff of type SPTE_SWAP
   int swap_page;
 
+  // Used iff page is currently present
+  void *kaddr;
+
   struct hash_elem elem;
 
   // TODO: add more data as needed here
@@ -38,6 +41,7 @@ bool vm_install_fs_spte(void *, struct file *, off_t, uint32_t, uint32_t, bool);
 bool vm_install_mmap_spte(void *, struct file *, off_t, uint32_t, uint32_t, bool);
 bool vm_install_swap_spte(void *, int, bool);
 bool vm_install_zero_spte(void *, bool);
+bool vm_set_kaddr(const void *, void *);
 struct vm_spte *vm_lookup_spte(const void *);
 void vm_free_spte(void *);
 void vm_free_spt(void);

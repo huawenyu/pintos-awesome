@@ -195,14 +195,35 @@ implementation.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+  struct mapped_file {
+    int id;     \\ mapid_t essentially
+    struct list_elem elem; 
+    void *page; \\ where the mapping begins
+    int length; \\ how many pages the mapping goes on for.
+  };
+The above is added to struct thread. 
+
 ---- ALGORITHMS ----
 
 >> C2: Describe how memory mapped files integrate into your virtual
 >> memory subsystem.  Explain how the page fault and eviction
 >> processes differ between swap pages and other pages.
 
+Essentially, when a file is memory mapped a page table entry is created that 
+indicates that the memory location in question is memory mapped. Then, at a page
+fault, the exception handler reads in the page from memory and memsets the 
+appropriate addresses with the file data. Eviction is simple - we check the page
+to see if it is dirty, and if it is we write to the appropriate position in the
+file to update it with page contents. No other pages write to files, they all 
+generally go into swap.
+
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
+
+We determine all the page addresses that a new file will require, and then check
+the page table in the thread's page directory to determine whether the addresses
+have been used or not. If they have, then the file mapping overlaps and a -1 is
+returned.
 
 ---- RATIONALE ----
 
@@ -212,6 +233,12 @@ implementation.
 >> that much of their implementation can be shared.  Explain why your
 >> implementation either does or does not share much of the code for
 >> the two situations.
+
+There are really a few things to think about when it comes to similarities and
+differences between mmap'd mappings and data demand-paged mappings. When we need
+to page in a VM page, the implementation is exactly the same from a filesystem
+page or a memroy mapped page. However, paging out is different as a memory
+mapped page goes right to file whereas the filesystem page gets swapped out.
 
 			   SURVEY QUESTIONS
 			   ================

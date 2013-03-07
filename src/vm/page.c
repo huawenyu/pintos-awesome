@@ -101,6 +101,15 @@ bool vm_install_zero_spte(void *uaddr, bool writable) {
   return hash_insert(&t->supp_pagedir, &(spte->elem)) == NULL;
 }
 
+bool vm_set_kaddr(const void *uaddr, void *kaddr) {
+  struct vm_spte *v;
+  v = vm_lookup_spte(uaddr);
+  if(v == NULL) { return false; }
+
+  v->kaddr = kaddr;
+  return true; 
+}
+
 struct vm_spte *vm_lookup_spte(const void *uaddr) {
   struct vm_spte entry;
   struct hash_elem *e;

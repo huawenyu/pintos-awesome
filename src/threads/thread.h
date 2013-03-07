@@ -127,6 +127,8 @@ struct thread {
     int original_priority;              /*!< Priority before donation. */
     struct list_elem allelem;           /*!< List element for all threads list. */
     struct list_elem sleep_elem;        /*!< List element for sleeping threads list. */
+
+    void *esp;                          /*!< Keeps track of esp for kernel threads. */
     /**@}*/
 
     /*! Shared between thread.c and synch.c. */
