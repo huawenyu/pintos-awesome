@@ -46,12 +46,6 @@ mapid_t mmap(int fd, void *addr) {
   struct thread *curr = thread_current();
   int i;
   
-  // Check validity of address
-  if (addr >= PHYS_BASE || get_user(addr) == -1) {
-      exit(-1);
-      return -1;
-  }
-  
   if (addr == 0) {
     return -1;
   }
@@ -90,8 +84,14 @@ mapid_t mmap(int fd, void *addr) {
     struct mapped_file *ms = palloc_get_page(0);
     ms->page = addr;
     ms->length = num_pages;
-    ms->id = list_entry(list_back(&(thread_current()->mapped_files)), 
-      struct mapped_file, elem)->id + 1;
+    if (list_empty(&(thread_current()->mapped_files))) {
+      ms->id = 0;
+    }
+    else
+    {
+      ms->id = list_entry(list_back(&(thread_current()->mapped_files)), 
+        struct mapped_file, elem)->id + 1;
+    }
     
     curr_addr = addr;
     int offset = 0;
@@ -134,7 +134,7 @@ void munmap(mapid_t mapping) {
         file_write_at(f, addr, page->read_bytes, page->offset);
       }
       pagedir_clear_page(curr->pagedir, addr);
-      vm_free_spte(page);
+      vm_free_spte(page->uaddr);
       page = vm_lookup_spte(ms->page + PGSIZE);
     }
     

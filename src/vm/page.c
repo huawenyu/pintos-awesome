@@ -61,7 +61,7 @@ bool vm_install_mmap_spte(void *uaddr, struct file *f, off_t offset,
   if(spte == NULL) { return false; }
 
   spte->uaddr = uaddr;
-  spte->type = SPTE_FS;
+  spte->type = SPTE_MMAP;
   spte->access_vector = 0;
   spte->file = f;
   spte->offset = offset;
