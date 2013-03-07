@@ -4,12 +4,15 @@
 #include "threads/thread.h"
 #include "threads/palloc.h"
 
+#define FRAME_TIMER_FREQ 100
+
 struct vm_frame {
   void *page; // The kernel address for the frame
   tid_t tid;
   struct list_elem elem;
   void *uaddr;
   bool done; // Data is done being loaded into the page
+  int count; // Number of times the frame has been accessed
 
   // TODO: add more data that is needed here
 };
@@ -22,6 +25,8 @@ void vm_frame_set_done(void *, bool);
 void vm_free_frame(void *);
 void vm_free_tid_frames(tid_t);
 
-void *vm_evict_frame(void);
+void vm_frame_tick(int64_t);
+struct vm_frame* vm_pick_evict(void);
+void *vm_evict_frame(void *);
 
 #endif // VM_FRAME_H
