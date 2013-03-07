@@ -17,7 +17,7 @@ Atharv Vaish <avaish@caltech.edu>
 >> What is the Git repository and commit hash for your submission?
 
    Repository URL: https://github.com/ilyanep/pintos-awesome 
-   commit ...
+   commit 9cb8351dcb0c72571f3115c2f6fd2cd4c74986e7
 
 ---- PRELIMINARIES ----
 
@@ -120,13 +120,6 @@ question.
 >> B2: When a frame is required but none is free, some frame must be
 >> evicted.  Describe your code for choosing a frame to evict.
 
-We implemented an aging policy where each frame has a 32-bit integer 
-called count which keeps track of how recently the page was accessed. 
-We set up the timer interrupt to update count when the timer fires 
-by bit shifting it to the right and setting the topmost bit to the 
-whether or not the frame has been accessed since then. Thus, the 
-frame we choose to evict is the youngest page.
-
 >> B3: When a process P obtains a frame that was previously used by a
 >> process Q, how do you adjust the page table (and any other data
 >> structures) to reflect the frame Q no longer has?
@@ -137,11 +130,6 @@ we need to do, aside from updating the frame table entry.
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
-
-If the address of the page fault is equal to the address of the esp 
-minus either 4 or 32, and the fault address isn't too far below 
-PHYS_BASE (we imposed a 8 MB limit), then this should cause the stack 
-to be extended into the page that faulted.
 
 ---- SYNCHRONIZATION ----
 
@@ -157,7 +145,6 @@ Anything that involves the frame table is wrapped in a vm lock.
 >> the page during the eviction process?  How do you avoid a race
 >> between P evicting Q's frame and Q faulting the page back in?
 
-We disable interrupts when evicting a page.
 
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
