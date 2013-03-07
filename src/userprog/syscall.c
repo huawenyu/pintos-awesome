@@ -2,19 +2,23 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <user/syscall.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "vm/page.h"
 
 static void syscall_handler(struct intr_frame *);
 static int get_four_bytes_user(const void *);
 static int get_user(const uint8_t *);
 static bool put_user(uint8_t *, uint8_t);
-static struct file_desc *get_file_descriptor(int fd);
+static struct file_desc *get_file_descriptor(int);
+static struct mapped_file *get_mapped_file(mapid_t);
 void halt(void);
 pid_t exec(const char*);
 int wait(pid_t);
@@ -27,6 +31,8 @@ int write(int, const void *, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
+mapid_t mmap(int, void *);
+void munmap(mapid_t);
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -36,19 +42,133 @@ void halt(void) {
   shutdown_power_off();
 }
 
+mapid_t mmap(int fd, void *addr) {
+  struct thread *curr = thread_current();
+  int i;
+  
+  // Check validity of address
+  if (addr >= PHYS_BASE || get_user(addr) == -1) {
+      exit(-1);
+      return -1;
+  }
+  
+  if (addr == 0) {
+    return -1;
+  }
+  
+  // Check validity of fd
+  if (fd == 0 || fd == 1) {
+    return -1;
+  }
+  
+  struct file_desc *d = get_file_descriptor(fd);
+  
+  if (d && d->file) {
+    lock_acquire(&filesys_lock);
+    int flength = file_length(d->file);
+    if (flength == 0) {
+      lock_release(&filesys_lock);
+      return -1;
+    }
+    
+    int num_pages = flength / PGSIZE + 1;
+    
+    if ((int) addr & (PGSIZE - 1) != 0) {
+      lock_release(&filesys_lock);
+      return -1;
+    }
+    
+    void *curr_addr = addr;
+    for (i = 0; i < num_pages; i++) {
+      if (pagedir_get_page(curr->pagedir, curr_addr) != NULL) {
+        lock_release(&filesys_lock);
+        return -1;
+      }
+    }
+    
+    // We should be ready to actually map at this point.
+    struct mapped_file *ms = palloc_get_page(0);
+    ms->page = addr;
+    ms->length = num_pages;
+    ms->id = list_entry(list_back(&(thread_current()->mapped_files)), 
+      struct mapped_file, elem)->id + 1;
+    
+    curr_addr = addr;
+    int offset = 0;
+    // Alter the SPT, add entries for each page
+    for (i = 0; i < num_pages; i++) {
+      if (flength >= PGSIZE) {
+        vm_install_mmap_spte(curr_addr, d->file, offset, PGSIZE, 0, true);
+      }
+      else {
+        vm_install_mmap_spte(curr_addr, d->file, offset, flength, 
+                             PGSIZE - flength, true);
+      }
+      curr_addr += PGSIZE;
+      offset += PGSIZE;
+    }
+    
+    list_push_back(&(thread_current()->mapped_files), &(ms->elem));
+    lock_release(&filesys_lock);
+    return ms->id;
+  }
+  
+  return -1;
+}
+
+void munmap(mapid_t mapping) {
+  struct thread *curr = thread_current();
+  int i;
+  
+  struct mapped_file *ms = get_mapped_file(mapping);
+  if (ms) {
+    struct vm_spte *page = vm_lookup_spte(ms->page);
+    int num_pages = ms->length;
+    
+    lock_acquire(&filesys_lock);
+    struct file *f = file_reopen(page->file);
+    
+    for (i = 0; i < num_pages; i++) {
+      void *addr = page->uaddr;
+      if (pagedir_is_dirty(curr->pagedir, addr)) {
+        file_write_at(f, addr, page->read_bytes, page->offset);
+      }
+      pagedir_clear_page(curr->pagedir, addr);
+      vm_free_spte(page);
+      page = vm_lookup_spte(ms->page + PGSIZE);
+    }
+    
+    file_close(f);
+    lock_release(&filesys_lock);
+    
+    list_remove(&(ms->elem));
+    palloc_free_page(ms);
+  }
+}
+
 void exit(int status) {
   printf("%s: exit(%d)\n", thread_current()->name, status);
   struct thread *curr = thread_current();
   struct file_desc *fd;
+  struct mapped_file *ms;
   struct child_thread *ct;
   struct list_elem *l;
   struct list_elem *e;
+  
+  while (!list_empty(&(curr->mapped_files))) {
+    l = list_begin(&(curr->mapped_files));
+    ms = list_entry(l, struct mapped_file, elem);
+    /* This should remove the ms from the ms list. */
+    munmap(ms->id);
+  }
+  
   while (!list_empty(&(curr->file_descs))) {
     l = list_begin(&(curr->file_descs));
     fd = list_entry(l, struct file_desc, elem);
     /* This should remove the fd from the fd list. */
     close(fd->id);
   }
+  
   if (curr->executable) {
     file_allow_write(curr->executable);
     file_close(curr->executable);
@@ -294,6 +414,22 @@ static struct file_desc *get_file_descriptor(int fd) {
   return NULL;
 }
 
+static struct mapped_file *get_mapped_file(mapid_t ms) {
+  struct list_elem *e;
+  
+  for (e = list_begin(&(thread_current()->mapped_files)); 
+       e != list_end(&(thread_current()->mapped_files));
+       e = list_next(e)) {
+  
+    struct mapped_file *d = list_entry(e, struct mapped_file, elem);
+    if (d->id == ms) {
+      return d;
+    }
+  }
+  
+  return NULL;
+}
+
 static void syscall_handler(struct intr_frame *f) {
   //  printf("system call!\n");
     int call_num = get_four_bytes_user(f->esp);
@@ -344,6 +480,13 @@ static void syscall_handler(struct intr_frame *f) {
         break;
       case SYS_CLOSE:
         close(get_four_bytes_user(f->esp + 4));
+        break;
+      case SYS_MMAP:
+        f->eax = (mapid_t) mmap(get_four_bytes_user(f->esp + 4),
+                                (void *) get_four_bytes_user(f->esp + 8));
+        break;
+      case SYS_MUNMAP:
+        munmap((mapid_t) get_four_bytes_user(f->esp + 4));
         break;
       default:
         printf("Unimplemented system call number");

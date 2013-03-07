@@ -52,6 +52,7 @@ bool vm_install_fs_spte(void *uaddr, struct file *f, off_t offset,
 }
 
 bool vm_install_mmap_spte(void *uaddr, struct file *f, off_t offset,
+                        uint32_t read_bytes, uint32_t zero_bytes,
                         bool writable) {
   struct thread *t = thread_current();
 

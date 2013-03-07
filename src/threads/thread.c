@@ -733,6 +733,7 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   list_init(&t->file_descs);
   list_init(&t->child_threads);
+  list_init(&t->mapped_files);
 #endif
   t->desired_lock = NULL;
   t->magic = THREAD_MAGIC;

@@ -95,6 +95,13 @@ struct file_desc {
     struct file *file;
 };
 
+struct mapped_file {
+    int id;
+    struct list_elem elem;
+    void *page;
+    int length;
+};
+
 struct child_thread {
     tid_t pid;
     int exit_status;
@@ -137,6 +144,7 @@ struct thread {
     struct file *executable;
     struct list file_descs;
     struct list child_threads;
+    struct list mapped_files;
     uint32_t *pagedir;                  /*!< Page directory. */
     /**@{*/
 #endif

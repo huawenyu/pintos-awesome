@@ -21,8 +21,6 @@ struct vm_spte {
   // Used iff of type SPTE_FS or SPTE_MMAP
   struct file *file;
   off_t offset;
-
-  // used iff of type SPTE_FS
   uint32_t read_bytes;
   uint32_t zero_bytes;
   
@@ -37,7 +35,7 @@ struct vm_spte {
 // Some stuff
 void vm_init_spt(void);
 bool vm_install_fs_spte(void *, struct file *, off_t, uint32_t, uint32_t, bool);
-bool vm_install_mmap_spte(void *, struct file *, off_t, bool);
+bool vm_install_mmap_spte(void *, struct file *, off_t, uint32_t, uint32_t, bool);
 bool vm_install_swap_spte(void *, int, bool);
 bool vm_install_zero_spte(void *, bool);
 struct vm_spte *vm_lookup_spte(const void *);

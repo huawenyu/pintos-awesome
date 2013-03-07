@@ -182,6 +182,7 @@ static void page_fault(struct intr_frame *f) {
       }
       switch(v->type) {
         case SPTE_FS:
+        case SPTE_MMAP:
           lock_acquire(&filesys_lock);
           if(file_read_at(v->file, kpage, v->read_bytes, v->offset) 
               != v->read_bytes) {
@@ -195,15 +196,6 @@ static void page_fault(struct intr_frame *f) {
           break;
         case SPTE_ZERO:
           memset(fault_addr, 0, PGSIZE);
-          break;
-        case SPTE_MMAP:
-          lock_acquire(&filesys_lock);
-          if(file_read_at(v->file, kpage, v->read_bytes, v->offset) 
-              != v->read_bytes) {
-            goto failed;
-          }
-          memset(kpage + v->read_bytes, 0, v->zero_bytes);
-          lock_release(&filesys_lock);
           break;
       } 
         vm_frame_set_done(kpage, true);
