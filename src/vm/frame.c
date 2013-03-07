@@ -171,16 +171,16 @@ void *vm_evict_frame(void *new_uaddr) {
   if (evicted_spte->type == SPTE_FS) {
     if (dirty) {
       evicted_spte->type = SPTE_SWAP;
-      vm_swap_write(evicted_page);
+      evicted_spte->swap_page = vm_swap_write(evicted_page);
     }
   }
   else if (evicted_spte->type == SPTE_SWAP) {
-    vm_swap_write(evicted_page);
+    evicted_spte->swap_page = vm_swap_write(evicted_page);
   }
   else if (evicted_spte->type == SPTE_ZERO) {
     if (dirty) {
       evicted_spte->type = SPTE_SWAP;
-      vm_swap_write(evicted_page);
+      evicted_spte->swap_page = vm_swap_write(evicted_page);
     }
   }
   else if (evicted_spte->type == SPTE_MMAP) {
