@@ -34,6 +34,8 @@ struct cache_block {
     struct list_elem elem;
 };
 
+void buffer_cache_init(void);
+
 /* Checks if the block is already in the cache. */
 struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_idx);
 

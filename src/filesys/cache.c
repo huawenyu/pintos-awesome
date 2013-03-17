@@ -1,5 +1,8 @@
 #include "filesys/cache.h"
 #include <list.h>
+#include <debug.h>
+#include <stdio.h>
+#include <string.h>
 #include "devices/block.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
@@ -7,7 +10,11 @@
 static struct list cache_block_list;
 
 /* TODO: Add synchronization. */
-/* TODO: Initialize the list of blocks. */
+
+/* Initialize all necessary structures. */
+void buffer_cache_init(void) {
+    list_init(&cache_block_list);
+}
 
 /* Returns the block if the desired block is currently in the
  * cache and null otherwise. */
@@ -26,7 +33,7 @@ struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_i
     return NULL;
 }
 
-// TODO: Update inodes to call this function.
+// TODO: Implement read-ahead functionality. Should go in inode.c
 /* Reads a block from the cache. If it's not currently there, it 
  * finds the correct block from memory and puts it in the cache, 
  * evicting another block if necessary.
@@ -61,7 +68,6 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
     return c->block;
 }
 
-// TODO: Update inodes to call this function.
 /* Writes to a block in the cache. If it's not currently there, it 
  * finds the correct block from memory and puts it in the cache,
  * evicting another block if necessary.
@@ -139,7 +145,6 @@ void evict_block(void) {
     free(evict); // TODO: Does this free the malloc'd evict->block buffer as well?
 }
 
-// TODO: Update the timer to call this function.
 /* 1. Updates the count of each block depending on whether or 
  *    not it's been accessed since the last timer tick. 
  * 2. Writes all dirty blocks back to disk. */
@@ -156,8 +161,8 @@ void buffer_cache_tick(int64_t cur_ticks) {
             c->count = c->count >> 1;
             c->count &= (accessed << (sizeof(c->count) - 1));
             c->accessed = false;
+            e = list_next(e);
         }
-        e = list_next(e);
     }
 
     // TODO: Lock around this.
@@ -168,6 +173,7 @@ void buffer_cache_tick(int64_t cur_ticks) {
             if (c->dirty) {
                 cache_write_to_disk(c);
             }
+            e = list_next(e);
         }
     }
 }

@@ -12,6 +12,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "filesys/cache.h"
 
 #ifdef VM
 #include "vm/frame.h"
@@ -145,8 +146,11 @@ void timer_print_stats(void) {
 /*! Timer interrupt handler. */
 static void timer_interrupt(struct intr_frame *args UNUSED) {
     ticks++;
+#ifdef USERPROG
 #ifdef VM
     vm_frame_tick(timer_ticks());
+#endif
+    buffer_cache_tick(timer_ticks());
 #endif
     thread_tick(timer_ticks());
 }
