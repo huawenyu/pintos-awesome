@@ -11,7 +11,6 @@
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-#include "vm/page.h"
 
 static void syscall_handler(struct intr_frame *);
 static int get_four_bytes_user(const void *);
@@ -31,8 +30,11 @@ int write(int, const void *, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
+
+#ifdef VM
 mapid_t mmap(int, void *);
 void munmap(mapid_t);
+#endif
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -42,6 +44,7 @@ void halt(void) {
   shutdown_power_off();
 }
 
+#ifdef VM
 mapid_t mmap(int fd, void *addr) {
   struct thread *curr = thread_current();
   int i;
@@ -145,6 +148,7 @@ void munmap(mapid_t mapping) {
     palloc_free_page(ms);
   }
 }
+#endif
 
 void exit(int status) {
   printf("%s: exit(%d)\n", thread_current()->name, status);
@@ -155,12 +159,14 @@ void exit(int status) {
   struct list_elem *l;
   struct list_elem *e;
   
+#ifdef VM
   while (!list_empty(&(curr->mapped_files))) {
     l = list_begin(&(curr->mapped_files));
     ms = list_entry(l, struct mapped_file, elem);
     /* This should remove the ms from the ms list. */
     munmap(ms->id);
   }
+#endif
   
   while (!list_empty(&(curr->file_descs))) {
     l = list_begin(&(curr->file_descs));
@@ -481,6 +487,7 @@ static void syscall_handler(struct intr_frame *f) {
       case SYS_CLOSE:
         close(get_four_bytes_user(f->esp + 4));
         break;
+#ifdef VM
       case SYS_MMAP:
         f->eax = (mapid_t) mmap(get_four_bytes_user(f->esp + 4),
                                 (void *) get_four_bytes_user(f->esp + 8));
@@ -488,6 +495,7 @@ static void syscall_handler(struct intr_frame *f) {
       case SYS_MUNMAP:
         munmap((mapid_t) get_four_bytes_user(f->esp + 4));
         break;
+#endif
       default:
         printf("Unimplemented system call number");
         thread_exit();

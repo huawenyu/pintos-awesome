@@ -6,9 +6,12 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+
+#ifdef VM
 #include "vm/page.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#endif VM
 
 /*! Number of page faults processed. */
 static long long page_fault_cnt;
@@ -158,6 +161,8 @@ static void page_fault(struct intr_frame *f) {
            user ? "user" : "kernel");
 #endif
 
+
+#ifdef VM
     if(fault_addr == 0) {
       printf("Fault address in NULL!!!!\n");
       goto failed;
@@ -247,6 +252,7 @@ static void page_fault(struct intr_frame *f) {
     }
 
 failed:
+#endif
 
     printf("Failed to deal with page fault! Killing thread\n");
     kill(f);
