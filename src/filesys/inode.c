@@ -12,7 +12,11 @@
 #define INODE_MAGIC 0x494e4f44
 
 /*! On-disk inode.
-    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
+    Must be exactly BLOCK_SECTOR_SIZE bytes long.
+    There are 124 directly linked blocks. (62 kb)
+    There are 128 indirectly linked blocks. (64 kb)
+    There are 16384 doubly indirectly linked blocks. (8 mb)
+ */
 struct inode_disk {
     off_t length;                       /*!< File size in bytes. */
     unsigned magic;                     /*!< Magic number. */
@@ -63,7 +67,7 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
             free(index);
             return ret;
         }
-        if (sector < 16636) { // UGLY HARDCODED NUMBERS HERE
+        if (sector < 16636) { // UGLY HARDCODED NUMBERS HERE AND THROUGHOUT
             // doubly indirect block
             index = calloc(1, sizeof *index);
             
@@ -95,7 +99,58 @@ void inode_init(void) {
 // Removes and deallocs any blocks within the inode.
 void shrink(struct inode_disk *disk_inode, off_t length) {
   size_t sectors = bytes_to_sectors(length);
+  struct i_inode_disk *dbl_indirect = NULL;
+  struct i_inode_disk *indirect = NULL;
+  int i;
+  int j;
+  int count;
   
+  // doubly indirect blocks
+  if (sectors < 16636 && disk_inode->block_list[125] != -1) {
+    dbl_indirect = disk_inode->block_list[125];
+    for (i = 127; i >= 0; i--) {
+      if (sectors < 16636 - 128 * (127 - i) && dbl_indirect->block_list[i] != -1) {
+        indirect = dbl_indirect->block_list[i];
+        for (j = 127; j >= 0; j--) {
+          if (sectors < 16636 - 128 * (127 - i) - (127 - j) && indirect->block_list[j] != -1) {
+            free_map_release(indirect->block_list[j], 1);
+            indirect->block_list[j] = -1;
+          }
+        }
+        if (sectors < 16636 - 128 * (127 - i) - 127) {
+          free_map_release(indirect, 1);
+          dbl_indirect->block_list[i] = -1;
+        }
+      }
+    }
+    if (sectors < 253) {
+      free_map_release(dbl_indirect, 1);
+      disk_inode->block_list[125] = -1;
+    }
+  }
+  
+  // indirect blocks
+  if (sectors < 252 && disk_inode->block_list[124] != -1) {
+    indirect = disk_inode->block_list[124];
+    for (i = 127; i >= 0; i--) {
+      if (sectors < 252 - (127 - i)) {
+        free_map_release(indirect->block_list[i], 1);
+        indirect->block_list[i] = -1;
+      }
+    }
+    if (sectors < 125) {
+      free_map_release(indirect, 1);
+      disk_inode->block_list[124] = -1;
+    }
+  }
+  
+  // direct blocks
+  for (i = 123; i >= 0; i--) {
+    if (sectors < 124 - (123 - i) && disk_inode->block_list[i] != -1) {
+      free_map_release(disk_inode->block_list[i], 1);
+      disk_inode->block_list[i] = -1;
+    }
+  }
 }
 
 // Grows the file to a given length.
@@ -231,6 +286,7 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
         free(indirect);
       }
     }
+    block_write(fs_device, dbl_indirect_sector, dbl_indirect);
     if (disk_inode->block_list[125] == -1) {
       disk_inode->block_list[125] = dbl_indirect_sector;
       free(dbl_indirect);
@@ -258,7 +314,6 @@ bool inode_create(block_sector_t sector, off_t length) {
     
   disk_inode = calloc(1, sizeof *disk_inode);    
   if (disk_inode != NULL) {
-    size_t sectors = bytes_to_sectors(length);
     disk_inode->length = 0;
     disk_inode->magic = INODE_MAGIC;
     
