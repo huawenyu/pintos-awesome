@@ -431,7 +431,7 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
         
         // EOF
         if (sector_idx = -1) {
-            break;
+          return bytes_read;
         }
         
         bounce = cache_read(inode, sector_idx);
@@ -459,7 +459,7 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         return 0;
     
     // grow if necessary
-    if (!grow(&(inode->data), offset + size)) return 0;
+    grow(&(inode->data), offset + size);
 
     while (size > 0) {
         /* Sector to write, starting byte offset within sector. */
@@ -475,6 +475,10 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         int chunk_size = size < min_left ? size : min_left;
         if (chunk_size <= 0)
             break;
+        
+        if (sector_idx = -1) {
+          return bytes_written;
+        }
         
         if (sector_ofs > 0 || chunk_size < sector_left)
             bounce = cache_write(inode, sector_idx);
