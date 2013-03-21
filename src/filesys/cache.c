@@ -10,6 +10,9 @@
 static struct list cache_block_list;
 bool fs_buffer_cache_is_inited = false;
 
+/* Checks if the block is already in the cache. */
+struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_idx);
+
 /* TODO: Add synchronization. */
 
 /* Initialize all necessary structures. */
@@ -149,8 +152,8 @@ void evict_block(void) {
     }
     list_remove(remove_elem);
     /* Free memory. */
-    free(evict); 
     free(evict->block);
+    free(evict); 
 }
 
 /* 1. Updates the count of each block depending on whether or 
