@@ -39,6 +39,9 @@ struct inode {
     struct inode_disk data;             /*!< Inode content. */
 };
 
+void shrink(struct inode_disk *, off_t length);
+bool grow(struct inode_disk *, off_t length);
+
 /*! Returns the block device sector that contains byte offset POS
     within INODE.
     Returns -1 if INODE does not contain data for a byte at offset
@@ -54,7 +57,7 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
             // indirect block
             index = calloc(1, sizeof *index);
             
-            block_read(fs_device, inode->data.block_list[124], index);
+            index = cache_read(inode, inode->data.block_list[124]);
             block_sector_t ret = index->block_list[sector - 124];
             
             free(index);
@@ -64,10 +67,10 @@ static block_sector_t byte_to_sector(const struct inode *inode, off_t pos) {
             // doubly indirect block
             index = calloc(1, sizeof *index);
             
-            block_read(fs_device, inode->data.block_list[125], index);
+            index = cache_read(inode, inode->data.block_list[125]);
             block_sector_t next = index->block_list[(sector - 252) / 128];
             
-            block_read(fs_device, next, index);
+            index = cache_read(inode, next);
             block_sector_t ret = index->block_list[(sector - 252) % 128];
             
             free(index);
@@ -89,6 +92,154 @@ void inode_init(void) {
     list_init(&open_inodes);
 }
 
+// Removes and deallocs any blocks within the inode.
+void shrink(struct inode_disk *disk_inode, off_t length) {
+  size_t sectors = bytes_to_sectors(length);
+  
+}
+
+// Grows the file to a given length.
+bool grow(struct inode_disk *disk_inode, off_t length) {
+  size_t sectors = bytes_to_sectors(length);
+  size_t cur_sectors = bytes_to_sectors(disk_inode->length);
+  struct i_inode_disk *indirect = NULL;
+  struct i_inode_disk *dbl_indirect = NULL;
+  uint32_t i;
+  uint32_t j;
+  block_sector_t file_sector = 0;
+  block_sector_t indirect_sector = 0;
+  block_sector_t dbl_indirect_sector = 0;
+  static char zeros[BLOCK_SECTOR_SIZE];
+  
+  size_t cur = bytes_to_sectors(disk_inode->length);
+  size_t growth = sectors - cur;
+  if (growth <= 0) return true;
+  
+  // direct blocks
+  if (cur < 124) {
+    for (i = cur; i < length && i < 124; i++) {
+      if (free_map_allocate(1, &file_sector)) {
+        block_write(fs_device, file_sector, zeros);
+        disk_inode->block_list[i] = file_sector;
+        growth--;
+      }
+      else {
+        shrink(disk_inode, cur_sectors);
+        return false;
+      }
+    }
+    cur = 124;
+  }
+  if (growth <= 0) return true;
+  
+  // indirect blocks
+  if (cur < 252) {
+    if (disk_inode->block_list[124] == -1) {
+      indirect = calloc(1, sizeof *indirect);
+      if (indirect == NULL) {
+        shrink(disk_inode, cur_sectors);
+        return false;
+      }
+      if (free_map_allocate(1, &indirect_sector)) {
+        for (i = 0; i < 128; i++) {
+          indirect->block_list[i] = -1;
+        }
+      }
+      else {
+        shrink(disk_inode, cur_sectors);
+        return false;
+      }
+    }
+    else {
+      indirect = &(disk_inode->block_list[124]);
+    }
+    for (i = cur; i < (sectors - 124) && i < 128; i++) {
+      if (free_map_allocate(1, &file_sector)) {
+        block_write(fs_device, file_sector, zeros);
+        indirect->block_list[i] = file_sector;
+        growth--;
+      }
+      else {
+        shrink(disk_inode, cur_sectors);
+        return false;
+      }
+    }
+    block_write(fs_device, indirect_sector, indirect);
+    if (disk_inode->block_list[124] == -1) {
+      disk_inode->block_list[124] = indirect_sector;
+      free(indirect);
+    }
+    cur = 252;
+  }
+  if (growth <= 0) return true;
+  
+  // doubly indirect blocks
+  if (cur < 16636) {
+    if (disk_inode->block_list[125] == -1) {
+      dbl_indirect = calloc(1, sizeof *dbl_indirect);
+      if (dbl_indirect == NULL) {
+        shrink(disk_inode, cur);
+        return false;
+      }
+      if (free_map_allocate(1, &dbl_indirect_sector)) {
+        for (i = 0; i < 128; i++) {
+          dbl_indirect->block_list[i] = -1;
+        }
+      }
+      else {
+        shrink(disk_inode, cur);
+        return false;
+      }
+    }
+    else {
+      dbl_indirect = &(disk_inode->block_list[125]);
+    }
+    for (i = (cur - 252) / 128; i < (sectors - 252) / 128 + 1 && i < 128; i++) {
+      if (dbl_indirect->block_list[i] == -1) {
+        indirect = calloc(1, sizeof *indirect);
+        if (indirect == NULL) {
+          shrink(disk_inode, cur_sectors);
+          return false;
+        }
+        if (free_map_allocate(1, &indirect_sector)) {
+          for (i = 0; i < 128; i++) {
+            indirect->block_list[i] = -1;
+          }
+        }
+        else {
+          shrink(disk_inode, cur_sectors);
+          return false;
+        }
+      }
+      else {
+        indirect = dbl_indirect->block_list[i];
+      }
+      for (j = cur - 252 - (i * 128); j < sectors - 252 - (i * 128) + 1 && j < 128; j++) {
+        if (free_map_allocate(1, &file_sector)) {
+          block_write(fs_device, file_sector, zeros);
+          indirect->block_list[i] = file_sector;
+          growth--;
+        }
+        else {
+          shrink(disk_inode, cur_sectors);
+          return false;
+        }
+      }
+      block_write(fs_device, indirect_sector, indirect);
+      if (dbl_indirect->block_list[i] == -1) {
+        dbl_indirect->block_list[i] = indirect_sector;
+        free(indirect);
+      }
+    }
+    if (disk_inode->block_list[125] == -1) {
+      disk_inode->block_list[125] = dbl_indirect_sector;
+      free(dbl_indirect);
+    }
+  }
+  if (growth <= 0) return true;
+  return false; // should never get here
+}
+
 /*! Initializes an inode with LENGTH bytes of data and
     writes the new inode to sector SECTOR on the file system
     device.
@@ -96,11 +247,8 @@ void inode_init(void) {
     Returns false if memory or disk allocation fails. */
 bool inode_create(block_sector_t sector, off_t length) {
   struct inode_disk *disk_inode = NULL;
-  struct i_inode_disk *indirect = NULL;
-  struct i_inode_disk *dbl_indirect = NULL;
-  int i;
-  int j;
   bool success = true;
+  int i;
 
   ASSERT(length >= 0);
 
@@ -111,139 +259,18 @@ bool inode_create(block_sector_t sector, off_t length) {
   disk_inode = calloc(1, sizeof *disk_inode);    
   if (disk_inode != NULL) {
     size_t sectors = bytes_to_sectors(length);
-    disk_inode->length = length;
+    disk_inode->length = 0;
     disk_inode->magic = INODE_MAGIC;
-        
-    block_sector_t file_sector = 0;
-    block_sector_t indirect_sector = 0;
-    block_sector_t dbl_indirect_sector = 0;
-        
-    static char zeros[BLOCK_SECTOR_SIZE];
-        
+    
     for (i = 0; i < 126; i++) {
       disk_inode->block_list[i] = -1;
     }
-        
-    // disk inode in memory, not saved to disk
-        
-    // direct blocks
-    for (i = 0; i < sectors && i < 124; i++) {
-      if (free_map_allocate(1, &file_sector)) {
-        block_write(fs_device, file_sector, zeros);
-        disk_inode->block_list[i] = file_sector;
-      }
-      else {
-        success = false;
-        break;
-      }
-    }
-        
-    // indirect blocks
-    if (success && sectors > 124) {
-      indirect = calloc(1, sizeof *indirect);
-      if (indirect != NULL) {
-        if (free_map_allocate(1, &indirect_sector)) {
-          for (i = 0; i < 128; i++) {
-            indirect->block_list[i] = -1;
-          }
-                    
-          for (i = 0; i < (sectors - 124) && i < 128; i++) {
-            if (free_map_allocate(1, &file_sector)) {
-              block_write(fs_device, file_sector, zeros);
-              indirect->block_list[i] = file_sector;
-            }
-            else {
-              success = false;
-              break;
-            }
-          }
-            
-          block_write(fs_device, indirect_sector, indirect);
-          disk_inode->block_list[124] = indirect_sector;
-          free(indirect);
-        }
-        else {
-          // no disk space
-          free(indirect);
-          success = false;
-        }
-      }
-      else {
-        // no memory for indirect disk inode
-        success = false;
-      }
-    }
-        
-    // doubly indirect blocks - this part is a MESS
-    if (success && sectors > 252) {
-      dbl_indirect = calloc(1, sizeof *dbl_indirect);
-      if (dbl_indirect != NULL) {
-        if (free_map_allocate(1, &dbl_indirect_sector)) {
-          for (i = 0; i < 128; i++) {
-            dbl_indirect->block_list[i] = -1;
-          }
-                    
-          for (i = 0; i <= (sectors - 253) / 128 && i < 128; i++) {
-            indirect = calloc(1, sizeof *indirect);
-            if (indirect != NULL) {
-              if (free_map_allocate(1, &indirect_sector)) {
-                for (j = 0; j < 128; j++) {
-                  indirect->block_list[j] = -1;
-                }
-                                
-                for (j = 0; j <= sectors - 253 - (i * 128) && j < 128; j++) {
-                  if (free_map_allocate(1, &file_sector)) {
-                    block_write(fs_device, file_sector, zeros);
-                    indirect->block_list[j] = file_sector;
-                  }
-                  else {
-                    success = false;
-                    break;
-                  }
-                }
-                                
-                block_write(fs_device, indirect_sector, indirect);
-                dbl_indirect->block_list[i] = indirect_sector;
-                free(indirect);
-              }
-              else {
-                free(indirect);
-                success = false;
-                break;
-              }
-            }
-            else {
-              success = false;
-              break;
-            }
-          }
-            
-          block_write(fs_device, dbl_indirect_sector, dbl_indirect);
-          disk_inode->block_list[125] = dbl_indirect_sector;
-          free(dbl_indirect);
-        }
-        else {
-          // no disk space
-          free(dbl_indirect);
-          success = false;
-        }
-      }
-      else {
-        // no memory for doubly indirect disk inode
-        success = false;
-      }
-    }
     
-    if (!success) {
-      cleanup(disk_inode);
-      free(disk_inode);
-      return false;
-    }
-    else {
-      block_write(fs_device, sector, disk_inode);
-      free(disk_inode);
-      return true;
-    }
+    success = grow(disk_inode, length);
+    if (success) block_write(fs_device, sector, disk_inode);
+    
+    free(disk_inode);
+    return success;
   }
     
   // no memory for disk inode
@@ -310,8 +337,7 @@ void inode_close(struct inode *inode) {
         /* Deallocate blocks if removed. */
         if (inode->removed) {
             free_map_release(inode->sector, 1);
-            free_map_release(inode->data.start,
-                             bytes_to_sectors(inode->data.length)); 
+            shrink(&(inode->data), 0);
         }
 
         free(inode); 
@@ -347,25 +373,12 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
         int chunk_size = size < min_left ? size : min_left;
         if (chunk_size <= 0)
             break;
-
-        /* OLD: */
-        //if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE) {
-        //    /* Read full sector directly into caller's buffer. */
-        //    block_read (fs_device, sector_idx, buffer + bytes_read);
-        //}
-        //else {
-        //    /* Read sector into bounce buffer, then partially copy
-        //       into caller's buffer. */
-        //    if (bounce == NULL) {
-        //        bounce = malloc(BLOCK_SECTOR_SIZE);
-        //        if (bounce == NULL)
-        //            break;
-        //    }
-        //    bounce = cache_read(inode, sector_idx);
-        //    block_read(fs_device, sector_idx, bounce);
-        //    memcpy(buffer + bytes_read, bounce + sector_ofs, chunk_size);
-        //}
-        /* ENDOLD */
+        
+        // EOF
+        if (sector_idx = -1) {
+            break;
+        }
+        
         bounce = cache_read(inode, sector_idx);
         memcpy(buffer + bytes_read, bounce + sector_ofs, chunk_size);
 
@@ -381,9 +394,7 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
 
 /*! Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
     Returns the number of bytes actually written, which may be
-    less than SIZE if end of file is reached or an error occurs.
-    (Normally a write at end of file would extend the inode, but
-    growth is not yet implemented.) */
+    less than SIZE if an error occurs. */
 off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t offset) {
     const uint8_t *buffer = buffer_;
     off_t bytes_written = 0;
@@ -391,6 +402,9 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
 
     if (inode->deny_write_cnt)
         return 0;
+    
+    // grow if necessary
+    if (!grow(&(inode->data), offset + size)) return 0;
 
     while (size > 0) {
         /* Sector to write, starting byte offset within sector. */
@@ -406,33 +420,7 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         int chunk_size = size < min_left ? size : min_left;
         if (chunk_size <= 0)
             break;
-
-        /* OLD: */
-        //if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE) {
-        //    /* Write full sector directly to disk. */
-        //    block_write(fs_device, sector_idx, buffer + bytes_written);
-        //}
-        //else {
-        //    /* We need a bounce buffer. */
-        //    if (bounce == NULL) {
-        //        bounce = malloc(BLOCK_SECTOR_SIZE);
-        //        if (bounce == NULL)
-        //            break;
-        //    }
-
-        //    /* If the sector contains data before or after the chunk
-        //       we're writing, then we need to read in the sector
-        //       first.  Otherwise we start with a sector of all zeros. */
-
-        //    if (sector_ofs > 0 || chunk_size < sector_left) 
-        //        block_read(fs_device, sector_idx, bounce);
-        //    else
-        //        memset (bounce, 0, BLOCK_SECTOR_SIZE);
-
-        //    memcpy(bounce + sector_ofs, buffer + bytes_written, chunk_size);
-        //    block_write(fs_device, sector_idx, bounce);
-        //}
-        /* ENDOLD */
+        
         if (sector_ofs > 0 || chunk_size < sector_left)
             bounce = cache_write(inode, sector_idx);
         else
