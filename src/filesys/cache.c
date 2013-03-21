@@ -144,7 +144,8 @@ void evict_block(void) {
         cache_write_to_disk(evict);
     }
     /* Free memory. */
-    free(evict); // TODO: Does this free the malloc'd evict->block buffer as well?
+    free(evict); 
+    free(evict->block);
 }
 
 /* 1. Updates the count of each block depending on whether or 
