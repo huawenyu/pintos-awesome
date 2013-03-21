@@ -151,6 +151,8 @@ void shrink(struct inode_disk *disk_inode, off_t length) {
       disk_inode->block_list[i] = -1;
     }
   }
+  
+  disk_inode->length = length;
 }
 
 // Grows the file to a given length.
@@ -167,12 +169,15 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
   static char zeros[BLOCK_SECTOR_SIZE];
   
   size_t cur = bytes_to_sectors(disk_inode->length);
-  size_t growth = sectors - cur;
-  if (growth <= 0) return true;
+  int growth = sectors - cur;
+  if (growth <= 0) {
+    disk_inode->length = length;
+    return true;
+  }
   
   // direct blocks
   if (cur < 124) {
-    for (i = cur; i < length && i < 124; i++) {
+    for (i = cur; i < sectors && i < 124; i++) {
       if (free_map_allocate(1, &file_sector)) {
         block_write(fs_device, file_sector, zeros);
         disk_inode->block_list[i] = file_sector;
@@ -185,7 +190,10 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
     }
     cur = 124;
   }
-  if (growth <= 0) return true;
+  if (growth <= 0) {
+    disk_inode->length = length;
+    return true;
+  }
   
   // indirect blocks
   if (cur < 252) {
@@ -226,7 +234,10 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
     }
     cur = 252;
   }
-  if (growth <= 0) return true;
+  if (growth <= 0) {
+    disk_inode->length = length;
+    return true;
+  }
   
   // doubly indirect blocks
   if (cur < 16636) {
@@ -292,7 +303,10 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
       free(dbl_indirect);
     }
   }
-  if (growth <= 0) return true;
+  if (growth <= 0) {
+    disk_inode->length = length;
+    return true;
+  }
   return false; // should never get here
 }
 
@@ -430,7 +444,7 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
             break;
         
         // EOF
-        if (sector_idx = -1) {
+        if (sector_idx == -1) {
           return bytes_read;
         }
         
@@ -459,7 +473,10 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         return 0;
     
     // grow if necessary
-    grow(&(inode->data), offset + size);
+    if (offset + size > inode->data.length) {
+      bool success = grow(&(inode->data), offset + size);
+      block_write(fs_device, inode->sector, &(inode->data));
+    }
 
     while (size > 0) {
         /* Sector to write, starting byte offset within sector. */
@@ -476,7 +493,7 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         if (chunk_size <= 0)
             break;
         
-        if (sector_idx = -1) {
+        if (sector_idx == -1) {
           return bytes_written;
         }
         
