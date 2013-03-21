@@ -88,7 +88,7 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         /* Reads the data from the disk to the buffer.
          * Writes happen later. */
         block_read(fs_device, sector_idx, buffer);
-        // TODO: palloc c?
+        c = malloc(sizeof(struct cache_block));
         c->inode = inode;
         c->sector_idx = sector_idx;
         c->block = buffer;
