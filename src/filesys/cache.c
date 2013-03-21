@@ -178,6 +178,7 @@ void buffer_cache_tick(int64_t cur_ticks) {
             c = list_entry(e, struct cache_block, elem);
             if (c->dirty) {
                 cache_write_to_disk(c);
+                c->dirty = false;
             }
             e = list_next(e);
         }
