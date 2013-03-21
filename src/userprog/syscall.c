@@ -237,7 +237,7 @@ bool create(const char *file, unsigned initial_size) {
       return -1;
   }
   
-  retval = filesys_create(file, initial_size);
+  retval = filesys_create(file, initial_size, thread_current()->cwd);
   return retval;
 }
 
@@ -270,6 +270,7 @@ int open (const char *file) {
   }
   
   fd->file = f;
+  
   if (list_empty(&(thread_current()->file_descs))) {
     fd->id = 3;
   }
