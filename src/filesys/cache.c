@@ -61,8 +61,8 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
         c->dirty = false;
         if (list_size(&cache_block_list) == CACHE_SIZE) {
             evict_block();
-            list_push_back(&cache_block_list, &c->elem);
         }
+        list_push_back(&cache_block_list, &c->elem);
     }
     else {
         c->accessed = true;
@@ -97,8 +97,8 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         c->dirty = true;
         if (list_size(&cache_block_list) == CACHE_SIZE) {
             evict_block();
-            list_push_back(&cache_block_list, &c->elem);
         }
+        list_push_back(&cache_block_list, &c->elem);
     }
     else {
         c->accessed = true;
@@ -128,6 +128,7 @@ void evict_block(void) {
     e = list_head(&cache_block_list);
     ASSERT(e != NULL);
     c = list_entry(e, struct cache_block, elem);
+    evict = c;
     lowest_count = c->count;
     while (e != list_end(&cache_block_list)) {
         c = list_entry(e, struct cache_block, elem);
