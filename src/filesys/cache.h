@@ -38,8 +38,6 @@ extern bool fs_buffer_cache_is_inited;
 
 void buffer_cache_init(void);
 
-/* Checks if the block is already in the cache. */
-struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_idx);
 
 /* Evicts a block currently in the cache. */
 void evict_block(void);

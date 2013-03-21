@@ -435,6 +435,7 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
         }
         
         bounce = cache_read(inode, sector_idx);
+        if(bounce == NULL) { break; }
         memcpy(buffer + bytes_read, bounce + sector_ofs, chunk_size);
 
         /* Advance. */
@@ -480,6 +481,7 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         }
         
         bounce = cache_write(inode, sector_idx);
+        if(bounce == NULL) { break; }
         if (sector_ofs == 0 && chunk_size == sector_left)
             memset(bounce, 0, BLOCK_SECTOR_SIZE);
         memcpy(bounce + sector_ofs, buffer + bytes_written, chunk_size);

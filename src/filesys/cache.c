@@ -10,6 +10,9 @@
 static struct list cache_block_list;
 bool fs_buffer_cache_is_inited = false;
 
+/* Checks if the block is already in the cache. */
+struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_idx);
+
 /* TODO: Add synchronization. */
 
 /* Initialize all necessary structures. */
@@ -24,7 +27,7 @@ struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_i
     struct list_elem *e;
     struct cache_block *c;
 
-    e = list_head(&cache_block_list);
+    e = list_begin(&cache_block_list);
     while (e != list_end(&cache_block_list) && e != NULL) {
         c = list_entry(e, struct cache_block, elem);
         if (c->inode == inode && c->sector_idx == sector_idx) {
@@ -51,8 +54,10 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
      * evicting an old block if necessary. */
     if (c == NULL) {
         buffer = malloc(BLOCK_SECTOR_SIZE);
+        if(buffer == NULL) { return NULL; }
         block_read(fs_device, sector_idx, buffer);
         c = malloc(sizeof(struct cache_block));
+        if(c == NULL) { return NULL; }
         c->inode = inode;
         c->sector_idx = sector_idx;
         c->block = buffer;
@@ -85,10 +90,12 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
      * evicting an old block if necessary. */
     if (c == NULL) {
         buffer = malloc(BLOCK_SECTOR_SIZE);
+        if(buffer == NULL) { return NULL; }
         /* Reads the data from the disk to the buffer.
          * Writes happen later. */
         block_read(fs_device, sector_idx, buffer);
         c = malloc(sizeof(struct cache_block));
+        if(c == NULL) { return NULL; }
         c->inode = inode;
         c->sector_idx = sector_idx;
         c->block = buffer;
@@ -126,7 +133,7 @@ void evict_block(void) {
     struct cache_block *evict = NULL;
     int lowest_count;
 
-    e = list_head(&cache_block_list);
+    e = list_begin(&cache_block_list);
     ASSERT(e != NULL);
     c = list_entry(e, struct cache_block, elem);
     evict = c;
@@ -149,8 +156,8 @@ void evict_block(void) {
     }
     list_remove(remove_elem);
     /* Free memory. */
-    free(evict); 
     free(evict->block);
+    free(evict); 
 }
 
 /* 1. Updates the count of each block depending on whether or 
@@ -164,7 +171,7 @@ void buffer_cache_tick(int64_t cur_ticks) {
     bool accessed;
 
     if (cur_ticks % CACHE_TIMER_FREQ == 0) {
-        e = list_head(&cache_block_list);
+        e = list_begin(&cache_block_list);
         while (e != list_end(&cache_block_list) && e != NULL) {
             c = list_entry(e, struct cache_block, elem);
             accessed = c->accessed;
@@ -177,7 +184,7 @@ void buffer_cache_tick(int64_t cur_ticks) {
 
     // TODO: Lock around this.
     if (cur_ticks % CACHE_WRITE_ALL_FREQ == 0) {
-        e = list_head(&cache_block_list);
+        e = list_begin(&cache_block_list);
         while (e != list_end(&cache_block_list) && e != NULL) {
             c = list_entry(e, struct cache_block, elem);
             if (c->dirty) {
