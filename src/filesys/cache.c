@@ -121,6 +121,7 @@ void cache_write_to_disk(struct cache_block *c) {
 /* Uses an aging replacement policy to find the block to evict. */
 void evict_block(void) {
     struct list_elem *e;
+    struct list_elem *remove_elem;
     struct cache_block *c;
     struct cache_block *evict = NULL;
     int lowest_count;
@@ -130,11 +131,13 @@ void evict_block(void) {
     c = list_entry(e, struct cache_block, elem);
     evict = c;
     lowest_count = c->count;
+    remove_elem = e;
     while (e != list_end(&cache_block_list)) {
         c = list_entry(e, struct cache_block, elem);
         if (c->count < lowest_count) {
             lowest_count = c->count;
             evict = c;
+            remove_elem = e;
         }
         e = list_next(e);
     }
@@ -144,6 +147,7 @@ void evict_block(void) {
     if (evict->dirty) {
         cache_write_to_disk(evict);
     }
+    list_remove(remove_elem);
     /* Free memory. */
     free(evict); 
     free(evict->block);
