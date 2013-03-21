@@ -9,6 +9,9 @@
 #define ROOT_DIR_SECTOR 1       /*!< Root directory file inode sector. */
 /*! @} */
 
+// Filesys lock by block
+extern struct lock *filesys_lock_list;
+
 /*! Block device that contains the file system. */
 struct block *fs_device;
 

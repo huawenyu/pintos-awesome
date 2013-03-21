@@ -273,8 +273,16 @@ bool lock_try_acquire(struct lock *lock) {
     ASSERT(!lock_held_by_current_thread(lock));
 
     success = sema_try_down(&lock->semaphore);
-    if (success)
+    if (success) {
       lock->holder = thread_current();
+      if(!thread_mlfqs) {
+      lock->holder->desired_lock = NULL;
+      /* Once the thread acquires the lock, insert it into its locks 
+       * list. */
+      list_insert_ordered(&(lock->holder->locks), &(lock->lockelem), 
+                          lock_less_func, NULL);
+      }
+    }
 
     return success;
 }

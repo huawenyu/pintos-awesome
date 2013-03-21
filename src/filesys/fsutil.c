@@ -137,8 +137,12 @@ void fsutil_extract(char **argv UNUSED) {
        end-of-archive marker. */
     printf("Erasing ustar archive...\n");
     memset(header, 0, BLOCK_SECTOR_SIZE);
+    lock_acquire(filesys_lock_list + 0);
     block_write(src, 0, header);
+    lock_release(filesys_lock_list + 0);
+    lock_acquire(filesys_lock_list + 1);
     block_write(src, 1, header);
+    lock_release(filesys_lock_list + 1);
 
     free(data);
     free(header);
@@ -181,7 +185,10 @@ void fsutil_append(char **argv) {
     /* Write ustar header to first sector. */
     if (!ustar_make_header(file_name, USTAR_REGULAR, size, buffer))
         PANIC("%s: name too long for ustar format", file_name);
-    block_write(dst, sector++, buffer);
+    lock_acquire(filesys_lock_list + sector);
+    block_write(dst, sector, buffer);
+    lock_release(filesys_lock_list + sector);
+    sector++;
 
     /* Do copy. */
     while (size > 0) {
@@ -191,7 +198,10 @@ void fsutil_append(char **argv) {
         if (file_read(src, buffer, chunk_size) != chunk_size)
             PANIC("%s: read failed with %"PROTd" bytes unread", file_name, size);
         memset(buffer + chunk_size, 0, BLOCK_SECTOR_SIZE - chunk_size);
-        block_write(dst, sector++, buffer);
+        lock_acquire(filesys_lock_list + sector);
+        block_write(dst, sector, buffer);
+        lock_release(filesys_lock_list + sector);
+        sector++;
         size -= chunk_size;
     }
 
@@ -199,8 +209,11 @@ void fsutil_append(char **argv) {
        sectors full of zeros.  Don't advance our position past
        them, though, in case we have more files to append. */
     memset(buffer, 0, BLOCK_SECTOR_SIZE);
+    lock_acquire(filesys_lock_list + sector);
     block_write(dst, sector, buffer);
-    block_write(dst, sector, buffer + 1);
+    block_write(dst, sector, buffer + 1); // Ilya's note: I think this might be a
+                                          // bug in the original code?
+    lock_release(filesys_lock_list + sector);
 
     /* Finish up. */
     file_close(src);
