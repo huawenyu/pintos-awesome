@@ -129,6 +129,7 @@ struct thread {
     struct list_elem sleep_elem;        /*!< List element for sleeping threads list. */
 
     void *esp;                          /*!< Keeps track of esp for kernel threads. */
+    
     /**@}*/
 
     /*! Shared between thread.c and synch.c. */
@@ -144,6 +145,7 @@ struct thread {
     tid_t parent_pid;
     int load_success;
     struct file *executable;
+    struct dir *cwd;
     struct list file_descs;
     struct list child_threads;
     struct list mapped_files;

@@ -68,13 +68,16 @@ tid_t process_execute(const char *file_name) {
     sema_up(&lock_sema);
 
     child_t = get_thread_from_tid(tid);
-    thread_unblock(child_t);
     if (!child_t->load_success) {
+      thread_unblock(child_t);
       return -1;
     }
     
     struct file *f = filesys_open(pname);
-    if (!f) return -1;
+    if (!f) {
+      thread_unblock(child_t);
+      return -1;
+    }
     file_deny_write(f);
     
     child->pid = tid;
@@ -85,6 +88,8 @@ tid_t process_execute(const char *file_name) {
     // Update child thread to know parent thread
     child_t->parent_pid = curr->tid;
     child_t->executable = f;
+    child_t->cwd = curr->cwd;
+    thread_unblock(child_t);
     
     palloc_free_page(fn_copy2);
     

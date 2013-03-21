@@ -13,6 +13,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
+#include "filesys/directory.h"
 #include "userprog/process.h"
 #endif
 
@@ -731,6 +732,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->original_priority = priority;
   list_init(&t->locks);
 #ifdef USERPROG
+  t->cwd = dir_open_root();
   list_init(&t->file_descs);
   list_init(&t->child_threads);
   list_init(&t->mapped_files);
