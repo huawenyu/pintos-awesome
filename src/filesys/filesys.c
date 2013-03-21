@@ -10,16 +10,22 @@
 /*! Partition that contains the file system. */
 struct block *fs_device;
 
+struct lock *filesys_lock_list;
+
 static void do_format(void);
 
 /*! Initializes the file system module.
     If FORMAT is true, reformats the file system. */
 void filesys_init(bool format) {
-    lock_init(&filesys_lock);
-    
     fs_device = block_get_role(BLOCK_FILESYS);
     if (fs_device == NULL)
         PANIC("No file system device found, can't initialize file system.");
+
+    filesys_lock_list = malloc(sizeof(struct lock) * block_size(fs_device));
+    int i;
+    for(i=0; i < block_size(fs_device); ++i) {
+      lock_init(filesys_lock_list + i);
+    }
 
     inode_init();
     free_map_init();

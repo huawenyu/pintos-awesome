@@ -61,24 +61,20 @@ mapid_t mmap(int fd, void *addr) {
   struct file_desc *d = get_file_descriptor(fd);
   
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     int flength = file_length(d->file);
     if (flength == 0) {
-      lock_release(&filesys_lock);
       return -1;
     }
     
     int num_pages = flength / PGSIZE + 1;
     
     if ((int) addr & (PGSIZE - 1) != 0) {
-      lock_release(&filesys_lock);
       return -1;
     }
     
     void *curr_addr = addr;
     for (i = 0; i < num_pages; i++) {
       if (pagedir_get_page(curr->pagedir, curr_addr) != NULL) {
-        lock_release(&filesys_lock);
         return -1;
       }
     }
@@ -112,7 +108,6 @@ mapid_t mmap(int fd, void *addr) {
     }
     
     list_push_back(&(thread_current()->mapped_files), &(ms->elem));
-    lock_release(&filesys_lock);
     return ms->id;
   }
   
@@ -128,7 +123,6 @@ void munmap(mapid_t mapping) {
     struct vm_spte *page = vm_lookup_spte(ms->page);
     int num_pages = ms->length;
     
-    lock_acquire(&filesys_lock);
     struct file *f = file_reopen(page->file);
     
     for (i = 0; i < num_pages; i++) {
@@ -142,7 +136,6 @@ void munmap(mapid_t mapping) {
     }
     
     file_close(f);
-    lock_release(&filesys_lock);
     
     list_remove(&(ms->elem));
     palloc_free_page(ms);
@@ -225,9 +218,7 @@ pid_t exec(const char *cmd_line) {
       return -1;
   }
   
-  lock_acquire(&filesys_lock);
   child_tid = process_execute(cmd_line);
-  lock_release(&filesys_lock);
 
   return child_tid;
 }
@@ -246,9 +237,7 @@ bool create(const char *file, unsigned initial_size) {
       return -1;
   }
   
-  lock_acquire(&filesys_lock);
   retval = filesys_create(file, initial_size);
-  lock_release(&filesys_lock);
   return retval;
 }
 
@@ -261,9 +250,7 @@ bool remove(const char *file) {
       return -1;
   }
   
-  lock_acquire(&filesys_lock);
   retval = filesys_remove(file);
-  lock_release(&filesys_lock);
   return retval;
 }
 
@@ -277,13 +264,10 @@ int open (const char *file) {
       return -1;
   }
   
-  lock_acquire(&filesys_lock);
   f = filesys_open(file);
   if (!f) {
-    lock_release(&filesys_lock);
     return -1;
   }
-  lock_release(&filesys_lock);
   
   fd->file = f;
   if (list_empty(&(thread_current()->file_descs))) {
@@ -303,9 +287,7 @@ int filesize(int fd) {
   int retval = -1;
   
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     retval = file_length(d->file);
-    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -331,9 +313,7 @@ int read(int fd, void *buffer, unsigned size) {
   
   struct file_desc *d = get_file_descriptor(fd);
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     retval = file_read(d->file, buffer, size);
-    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -361,9 +341,7 @@ int write(int fd, const void *buffer, unsigned size) {
   
   struct file_desc *d = get_file_descriptor(fd);
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     retval = file_write(d->file, buffer, size);
-    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -373,9 +351,7 @@ void seek(int fd, unsigned position) {
   struct file_desc *d = get_file_descriptor(fd);
   
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     file_seek(d->file, position);
-    lock_release(&filesys_lock);
   }
 }
 
@@ -384,9 +360,7 @@ unsigned tell(int fd) {
   int retval = -1;
   
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     retval = file_tell(d->file);
-    lock_release(&filesys_lock);
   }
   
   return retval;
@@ -395,9 +369,7 @@ unsigned tell(int fd) {
 void close (int fd) {
   struct file_desc *d = get_file_descriptor(fd);
   if (d && d->file) {
-    lock_acquire(&filesys_lock);
     file_close(d->file);
-    lock_release(&filesys_lock);
     
     list_remove(&(d->elem));
     palloc_free_page(d);

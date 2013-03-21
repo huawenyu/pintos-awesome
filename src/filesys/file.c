@@ -3,7 +3,6 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 
-struct lock filesys_lock;
 
 /*! An open file. */
 struct file {

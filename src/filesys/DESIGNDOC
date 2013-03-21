@@ -152,6 +152,8 @@ It performs a write of all dirty blocks every certain number of ticks.
 >> buffer cache block, how are other processes prevented from evicting
 >> that block?
 
+The cache list is locked on both reads and writes.
+
 >> C6: During the eviction of a block from the cache, how are other
 >> processes prevented from attempting to access the block?
 

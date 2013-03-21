@@ -5,10 +5,13 @@
 #include <string.h>
 #include "devices/block.h"
 #include "filesys/filesys.h"
+#include "threads/interrupt.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 static struct list cache_block_list;
 bool fs_buffer_cache_is_inited = false;
+static struct lock cache_list_lock;
 
 /* Checks if the block is already in the cache. */
 struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_idx);
@@ -18,6 +21,7 @@ struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_i
 /* Initialize all necessary structures. */
 void buffer_cache_init(void) {
     list_init(&cache_block_list);
+    lock_init(&cache_list_lock);
     fs_buffer_cache_is_inited = true;
 }
 
@@ -27,14 +31,17 @@ struct cache_block * block_in_cache(struct inode *inode, block_sector_t sector_i
     struct list_elem *e;
     struct cache_block *c;
 
+    lock_acquire(&cache_list_lock);
     e = list_begin(&cache_block_list);
     while (e != list_end(&cache_block_list) && e != NULL) {
         c = list_entry(e, struct cache_block, elem);
         if (c->inode == inode && c->sector_idx == sector_idx) {
+            lock_release(&cache_list_lock);
             return c;
         }
         e = list_next(e);
     }
+    lock_release(&cache_list_lock);
     return NULL;
 }
 
@@ -55,7 +62,9 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
     if (c == NULL) {
         buffer = malloc(BLOCK_SECTOR_SIZE);
         if(buffer == NULL) { return NULL; }
+        lock_acquire(filesys_lock_list + sector_idx);
         block_read(fs_device, sector_idx, buffer);
+        lock_release(filesys_lock_list + sector_idx);
         c = malloc(sizeof(struct cache_block));
         if(c == NULL) { return NULL; }
         c->inode = inode;
@@ -64,10 +73,12 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
         c->count = 0;
         c->accessed = true;
         c->dirty = false;
-        if (list_size(&cache_block_list) == CACHE_SIZE) {
+        while (list_size(&cache_block_list) >= CACHE_SIZE) {
             evict_block();
         }
+        lock_acquire(&cache_list_lock);
         list_push_back(&cache_block_list, &c->elem);
+        lock_release(&cache_list_lock);
     }
     else {
         c->accessed = true;
@@ -93,7 +104,9 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         if(buffer == NULL) { return NULL; }
         /* Reads the data from the disk to the buffer.
          * Writes happen later. */
+        lock_acquire(filesys_lock_list + sector_idx);
         block_read(fs_device, sector_idx, buffer);
+        lock_release(filesys_lock_list + sector_idx);
         c = malloc(sizeof(struct cache_block));
         if(c == NULL) { return NULL; }
         c->inode = inode;
@@ -102,10 +115,12 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         c->count = 0;
         c->accessed = true;
         c->dirty = true;
-        if (list_size(&cache_block_list) == CACHE_SIZE) {
+        while (list_size(&cache_block_list) >= CACHE_SIZE) {
             evict_block();
         }
+        lock_acquire(&cache_list_lock);
         list_push_back(&cache_block_list, &c->elem);
+        lock_release(&cache_list_lock);
     }
     else {
         c->accessed = true;
@@ -120,9 +135,20 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
  * 2. Periodically when all dirty blocks are written back to disk
  *    (in buffer_cache_tick()). */
 void cache_write_to_disk(struct cache_block *c) {
-    // TODO: Lock around this.
+    lock_acquire(filesys_lock_list + c->sector_idx);
     block_write(fs_device, c->sector_idx, c->block);
+    lock_release(filesys_lock_list + c->sector_idx);
     c->dirty = false;
+}
+
+// Same as above but uses try_acquires so it can be called from
+// an interrupt context
+void cache_try_write_to_disk(struct cache_block *c) {
+    if(lock_try_acquire(filesys_lock_list + c->sector_idx)) {
+      block_write(fs_device, c->sector_idx, c->block);
+      lock_release(filesys_lock_list + c->sector_idx);
+      c->dirty = false;
+    }
 }
 
 /* Uses an aging replacement policy to find the block to evict. */
@@ -133,6 +159,7 @@ void evict_block(void) {
     struct cache_block *evict = NULL;
     int lowest_count;
 
+    lock_acquire(&cache_list_lock);
     e = list_begin(&cache_block_list);
     ASSERT(e != NULL);
     c = list_entry(e, struct cache_block, elem);
@@ -150,11 +177,12 @@ void evict_block(void) {
     }
 
     ASSERT(evict != NULL);
+    list_remove(remove_elem);
     /* Write to filesystem if block was dirty */
     if (evict->dirty) {
         cache_write_to_disk(evict);
     }
-    list_remove(remove_elem);
+    lock_release(&cache_list_lock);
     /* Free memory. */
     free(evict->block);
     free(evict); 
@@ -182,18 +210,34 @@ void buffer_cache_tick(int64_t cur_ticks) {
         }
     }
 
-    // TODO: Lock around this.
+
+
     if (cur_ticks % CACHE_WRITE_ALL_FREQ == 0) {
+      // Disable interrupts before we try to acquire a lock
+      // So that we don't accidentally get interrupted by
+      // the same handler and acquire the same lock again.
+      enum intr_level old_level = intr_disable();
+
+      // Only try acquire because we might be in the interrupt context
+      // for the thread that holds this lock
+      if(lock_try_acquire(&cache_list_lock)) {
+
         e = list_begin(&cache_block_list);
         while (e != list_end(&cache_block_list) && e != NULL) {
             c = list_entry(e, struct cache_block, elem);
             if (c->dirty) {
-                cache_write_to_disk(c);
+                cache_try_write_to_disk(c);
                 c->dirty = false;
             }
             e = list_next(e);
         }
+
+      lock_release(&cache_list_lock);
     }
+
+      intr_set_level(old_level);
+    }
+
 }
 
 

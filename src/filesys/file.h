@@ -6,8 +6,6 @@
 
 struct inode;
 
-// Filesys lock
-extern struct lock filesys_lock;
 
 /* Opening and closing files. */
 struct file *file_open (struct inode *);

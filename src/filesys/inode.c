@@ -7,6 +7,7 @@
 #include "filesys/free-map.h"
 #include "filesys/cache.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 /*! Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -78,13 +79,18 @@ bool inode_create(block_sector_t sector, off_t length) {
         disk_inode->length = length;
         disk_inode->magic = INODE_MAGIC;
         if (free_map_allocate(sectors, &disk_inode->start)) {
+            lock_acquire(filesys_lock_list + sector);
             block_write(fs_device, sector, disk_inode);
+            lock_release(filesys_lock_list + sector);
             if (sectors > 0) {
                 static char zeros[BLOCK_SECTOR_SIZE];
                 size_t i;
               
-                for (i = 0; i < sectors; i++) 
+                for (i = 0; i < sectors; i++) {
+                    lock_acquire(filesys_lock_list + disk_inode->start + i); 
                     block_write(fs_device, disk_inode->start + i, zeros);
+                    lock_release(filesys_lock_list + disk_inode->start + i);
+                }
             }
             success = true; 
         }
@@ -121,7 +127,9 @@ struct inode * inode_open(block_sector_t sector) {
     inode->open_cnt = 1;
     inode->deny_write_cnt = 0;
     inode->removed = false;
+    lock_acquire(filesys_lock_list + inode->sector);
     block_read(fs_device, inode->sector, &inode->data);
+    lock_release(filesys_lock_list + inode->sector);
     return inode;
 }
 
