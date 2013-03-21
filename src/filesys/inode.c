@@ -122,11 +122,21 @@ void shrink(struct inode_disk *disk_inode, off_t length) {
           free_map_release(indirect, 1);
           dbl_indirect->block_list[i] = -1;
         }
+        else {
+          lock_acquire(filesys_lock_list + dbl_indirect->block_list[i]);
+          block_write(fs_device, dbl_indirect->block_list[i], indirect);
+          lock_release(filesys_lock_list + dbl_indirect->block_list[i]);
+        }
       }
     }
     if (sectors < 253) {
       free_map_release(dbl_indirect, 1);
       disk_inode->block_list[125] = -1;
+    }
+    else {
+      lock_acquire(filesys_lock_list + disk_inode->block_list[125]);
+      block_write(fs_device, disk_inode->block_list[125], dbl_indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[125]);
     }
   }
   
@@ -142,6 +152,11 @@ void shrink(struct inode_disk *disk_inode, off_t length) {
     if (sectors < 125) {
       free_map_release(indirect, 1);
       disk_inode->block_list[124] = -1;
+    }
+    else {
+      lock_acquire(filesys_lock_list + disk_inode->block_list[124]);
+      block_write(fs_device, disk_inode->block_list[124], indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[124]);
     }
   }
   
@@ -180,7 +195,9 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
   if (cur < 124) {
     for (i = cur; i < sectors && i < 124; i++) {
       if (free_map_allocate(1, &file_sector)) {
+        lock_acquire(filesys_lock_list + file_sector);
         block_write(fs_device, file_sector, zeros);
+        lock_release(filesys_lock_list + file_sector);
         disk_inode->block_list[i] = file_sector;
         growth--;
       }
@@ -215,11 +232,13 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
       }
     }
     else {
-      indirect = &(disk_inode->block_list[124]);
+      block_read(fs_device, disk_inode->block_list[124], indirect);
     }
     for (i = cur; i < (sectors - 124) && i < 128; i++) {
       if (free_map_allocate(1, &file_sector)) {
+        lock_acquire(filesys_lock_list + file_sector);
         block_write(fs_device, file_sector, zeros);
+        lock_release(filesys_lock_list + file_sector);
         indirect->block_list[i] = file_sector;
         growth--;
       }
@@ -228,10 +247,17 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
         return false;
       }
     }
-    block_write(fs_device, indirect_sector, indirect);
     if (disk_inode->block_list[124] == -1) {
       disk_inode->block_list[124] = indirect_sector;
+      lock_acquire(filesys_lock_list + disk_inode->block_list[124]);
+      block_write(fs_device, disk_inode->block_list[124], indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[124]);
       free(indirect);
+    }
+    else {
+      lock_acquire(filesys_lock_list + disk_inode->block_list[124]);
+      block_write(fs_device, disk_inode->block_list[124], indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[124]);
     }
     cur = 252;
   }
@@ -259,7 +285,7 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
       }
     }
     else {
-      dbl_indirect = &(disk_inode->block_list[125]);
+      block_read(fs_device, disk_inode->block_list[125], dbl_indirect);
     }
     for (i = (cur - 252) / 128; i < (sectors - 252) / 128 + 1 && i < 128; i++) {
       if (dbl_indirect->block_list[i] == -1) {
@@ -279,11 +305,13 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
         }
       }
       else {
-        indirect = dbl_indirect->block_list[i];
+        block_read(fs_device, dbl_indirect->block_list[i], indirect);
       }
       for (j = cur - 252 - (i * 128); j < sectors - 252 - (i * 128) + 1 && j < 128; j++) {
         if (free_map_allocate(1, &file_sector)) {
+          lock_acquire(filesys_lock_list + file_sector);
           block_write(fs_device, file_sector, zeros);
+          lock_release(filesys_lock_list + file_sector);
           indirect->block_list[i] = file_sector;
           growth--;
         }
@@ -292,16 +320,30 @@ bool grow(struct inode_disk *disk_inode, off_t length) {
           return false;
         }
       }
-      block_write(fs_device, indirect_sector, indirect);
       if (dbl_indirect->block_list[i] == -1) {
         dbl_indirect->block_list[i] = indirect_sector;
+        lock_acquire(filesys_lock_list + dbl_indirect->block_list[i]);
+        block_write(fs_device, dbl_indirect->block_list[i], indirect);
+        lock_release(filesys_lock_list + dbl_indirect->block_list[i]);
         free(indirect);
       }
+      else {
+        lock_acquire(filesys_lock_list + dbl_indirect->block_list[i]);
+        block_write(fs_device, dbl_indirect->block_list[i], indirect);
+        lock_release(filesys_lock_list + dbl_indirect->block_list[i]);
+      }
     }
-    block_write(fs_device, dbl_indirect_sector, dbl_indirect);
     if (disk_inode->block_list[125] == -1) {
       disk_inode->block_list[125] = dbl_indirect_sector;
+      lock_acquire(filesys_lock_list + disk_inode->block_list[125]);
+      block_write(fs_device, disk_inode->block_list[125], dbl_indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[125]);
       free(dbl_indirect);
+    }
+    else {
+      lock_acquire(filesys_lock_list + disk_inode->block_list[125]);
+      block_write(fs_device, disk_inode->block_list[125], dbl_indirect);
+      lock_release(filesys_lock_list + disk_inode->block_list[125]);
     }
   }
   if (growth <= 0) {
@@ -337,7 +379,11 @@ bool inode_create(block_sector_t sector, off_t length) {
     }
     
     success = grow(disk_inode, length);
-    if (success) block_write(fs_device, sector, disk_inode);
+    if (success) {
+      lock_acquire(filesys_lock_list + sector);
+      block_write(fs_device, sector, disk_inode);
+      lock_release(filesys_lock_list + sector);
+    }
     
     free(disk_inode);
     return success;
@@ -476,7 +522,9 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
     // grow if necessary
     if (offset + size > inode->data.length) {
       bool success = grow(&(inode->data), offset + size);
+      lock_acquire(filesys_lock_list + inode->sector);
       block_write(fs_device, inode->sector, &(inode->data));
+      lock_release(filesys_lock_list + inode->sector);
     }
 
     while (size > 0) {
