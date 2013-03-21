@@ -140,12 +140,12 @@ int main(void) {
 
 
 #ifdef FILESYS
+    /* Added by Dan: */
+    buffer_cache_init();
     /* Initialize file system. */
     ide_init();
     locate_block_devices();
     filesys_init(format_filesys);
-    /* Added by Dan: */
-    buffer_cache_init();
 #endif
 
     printf("Boot complete.\n");

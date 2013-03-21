@@ -34,6 +34,8 @@ struct cache_block {
     struct list_elem elem;
 };
 
+extern bool fs_buffer_cache_is_inited;
+
 void buffer_cache_init(void);
 
 /* Checks if the block is already in the cache. */

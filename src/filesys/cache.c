@@ -8,12 +8,14 @@
 #include "threads/malloc.h"
 
 static struct list cache_block_list;
+bool fs_buffer_cache_is_inited = false;
 
 /* TODO: Add synchronization. */
 
 /* Initialize all necessary structures. */
 void buffer_cache_init(void) {
     list_init(&cache_block_list);
+    fs_buffer_cache_is_inited = true;
 }
 
 /* Returns the block if the desired block is currently in the
@@ -50,7 +52,7 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
     if (c == NULL) {
         buffer = malloc(BLOCK_SECTOR_SIZE);
         block_read(fs_device, sector_idx, buffer);
-        // TODO: palloc c?
+        c = malloc(sizeof(struct cache_block));
         c->inode = inode;
         c->sector_idx = sector_idx;
         c->block = buffer;
@@ -86,7 +88,7 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         /* Reads the data from the disk to the buffer.
          * Writes happen later. */
         block_read(fs_device, sector_idx, buffer);
-        // TODO: palloc c?
+        c = malloc(sizeof(struct cache_block));
         c->inode = inode;
         c->sector_idx = sector_idx;
         c->block = buffer;
@@ -149,6 +151,8 @@ void evict_block(void) {
  *    not it's been accessed since the last timer tick. 
  * 2. Writes all dirty blocks back to disk. */
 void buffer_cache_tick(int64_t cur_ticks) {
+    if(!fs_buffer_cache_is_inited) { return; } // Haven't inited buffer cache yet
+
     struct list_elem *e;
     struct cache_block *c;
     bool accessed;
