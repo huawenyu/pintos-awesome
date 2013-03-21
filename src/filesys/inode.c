@@ -127,9 +127,7 @@ struct inode * inode_open(block_sector_t sector) {
     inode->open_cnt = 1;
     inode->deny_write_cnt = 0;
     inode->removed = false;
-    lock_acquire(filesys_lock_list + inode->sector);
     block_read(fs_device, inode->sector, &inode->data);
-    lock_release(filesys_lock_list + inode->sector);
     return inode;
 }
 

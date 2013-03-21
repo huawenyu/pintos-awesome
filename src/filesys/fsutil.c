@@ -88,10 +88,7 @@ void fsutil_extract(char **argv UNUSED) {
         int size;
 
         /* Read and parse ustar header. */
-        lock_acquire(filesys_lock_list + sector);
-        block_read(src, sector, header);
-        lock_release(filesys_lock_list + sector);
-        sector++;
+        block_read(src, sector++, header);
         error = ustar_parse_header(header, &file_name, &type, &size);
         if (error != NULL) {
             PANIC("bad ustar header in sector %"PRDSNu" (%s)",
@@ -121,10 +118,7 @@ void fsutil_extract(char **argv UNUSED) {
             while (size > 0) {
                 int chunk_size =
                     (size > BLOCK_SECTOR_SIZE ? BLOCK_SECTOR_SIZE : size);
-                lock_acquire(filesys_lock_list + sector);
-                block_read(src, sector, data);
-                lock_release(filesys_lock_list + sector);
-                sector++;
+                block_read(src, sector++, data);
                 if (file_write(dst, data, chunk_size) != chunk_size) {
                     PANIC("%s: write failed with %d bytes unwritten",
                           file_name, size);

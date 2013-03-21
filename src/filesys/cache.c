@@ -62,9 +62,7 @@ uint8_t * cache_read(struct inode *inode, block_sector_t sector_idx) {
     if (c == NULL) {
         buffer = malloc(BLOCK_SECTOR_SIZE);
         if(buffer == NULL) { return NULL; }
-        lock_acquire(filesys_lock_list + sector_idx);
         block_read(fs_device, sector_idx, buffer);
-        lock_release(filesys_lock_list + sector_idx);
         c = malloc(sizeof(struct cache_block));
         if(c == NULL) { return NULL; }
         c->inode = inode;
@@ -104,9 +102,7 @@ uint8_t * cache_write(struct inode *inode, block_sector_t sector_idx) {
         if(buffer == NULL) { return NULL; }
         /* Reads the data from the disk to the buffer.
          * Writes happen later. */
-        lock_acquire(filesys_lock_list + sector_idx);
         block_read(fs_device, sector_idx, buffer);
-        lock_release(filesys_lock_list + sector_idx);
         c = malloc(sizeof(struct cache_block));
         if(c == NULL) { return NULL; }
         c->inode = inode;
