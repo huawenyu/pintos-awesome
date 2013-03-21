@@ -278,8 +278,8 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
         /* ENDOLD */
         bounce = cache_write(inode, sector_idx);
         if (sector_ofs == 0 && chunk_size == sector_left)
-        //    memset(bounce, 0, BLOCK_SECTOR_SIZE);
-        //memcpy(bounce + sector_ofs, buffer + bytes_written, chunk_size);
+            memset(bounce, 0, BLOCK_SECTOR_SIZE);
+        memcpy(bounce + sector_ofs, buffer + bytes_written, chunk_size);
 
         /* Advance. */
         size -= chunk_size;
