@@ -58,7 +58,7 @@ $ patch src/utils/pintos
 +    $sim = "qemu" if !defined $sim;    <<< if using simulator-qemu
   
 -	my $name = find_file ('kernel.bin');
-+	my $name = find_file ('/home/wilson/work/pintos/src/threads/build/kernel.b<
++	my $name = find_file ('/home/wilson/proj/pintos/src/threads/build/kernel.b<
 ```
   
 $ patch src/utils/Pintos.pm  
