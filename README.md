@@ -1,7 +1,8 @@
-pintos-awesome
-==============
-
-Pintos Awesome Edition  
+pintos
+======
+[manual](http://web.stanford.edu/class/cs140/projects/pintos/pintos.html)  
+  
+The Pintos Awesome Edition  
 By Daniel Chen, Ilya Nepomnyashchiy, and Atharv Vaish  
 
 install on fedora 21 with qemu
