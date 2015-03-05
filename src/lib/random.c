@@ -1,6 +1,9 @@
-/*! \file random.c
+#include "random.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include "debug.h"
 
-   RC4-based pseudo-random number generator (PRNG).
+/* RC4-based pseudo-random number generator (PRNG).
 
    RC4 is a stream cipher.  We're not using it here for its
    cryptographic properties, but because it is easy to implement
@@ -9,11 +12,6 @@
 
    See http://en.wikipedia.org/wiki/RC4_(cipher) for information
    on RC4.*/
-
-#include "random.h"
-#include <stdbool.h>
-#include <stdint.h>
-#include "debug.h"
 
 /* RC4 state. */
 static uint8_t s[256];          /* S[]. */

@@ -1,8 +1,5 @@
 # -*- makefile -*-
 
-ASFLAGS=-g
-LDFLAGS=-g
-
 all:
 
 include Make.vars

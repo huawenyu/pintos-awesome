@@ -1,11 +1,9 @@
 #ifndef FILESYS_FILE_H
 #define FILESYS_FILE_H
 
-#include "threads/synch.h"
 #include "filesys/off_t.h"
 
 struct inode;
-
 
 /* Opening and closing files. */
 struct file *file_open (struct inode *);
@@ -29,4 +27,3 @@ off_t file_tell (struct file *);
 off_t file_length (struct file *);
 
 #endif /* filesys/file.h */
-

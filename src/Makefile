@@ -1,9 +1,8 @@
 BUILD_SUBDIRS = threads userprog vm filesys
 
 all::
-	@echo "To build specific assignments, run 'make' in the following"
-	@echo "subdirectories:  $(BUILD_SUBDIRS)."
-	@echo "This top-level make has only 'clean', 'docs' and 'tags' targets."
+	@echo "Run 'make' in subdirectories: $(BUILD_SUBDIRS)."
+	@echo "This top-level make has only 'clean' targets."
 
 CLEAN_SUBDIRS = $(BUILD_SUBDIRS) examples utils
 
@@ -13,9 +12,6 @@ clean::
 
 distclean:: clean
 	find . -name '*~' -exec rm '{}' \;
-
-docs::
-	doxygen
 
 TAGS_SUBDIRS = $(BUILD_SUBDIRS) devices lib
 TAGS_SOURCES = find $(TAGS_SUBDIRS) -name \*.[chS] -print

@@ -6,4 +6,3 @@
 unsigned long cksum(const void *, size_t);
 
 #endif /* tests/cksum.h */
-

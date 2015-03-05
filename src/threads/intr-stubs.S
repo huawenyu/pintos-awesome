@@ -201,4 +201,3 @@ STUB(f0, zero) STUB(f1, zero) STUB(f2, zero) STUB(f3, zero)
 STUB(f4, zero) STUB(f5, zero) STUB(f6, zero) STUB(f7, zero)
 STUB(f8, zero) STUB(f9, zero) STUB(fa, zero) STUB(fb, zero)
 STUB(fc, zero) STUB(fd, zero) STUB(fe, zero) STUB(ff, zero)
-

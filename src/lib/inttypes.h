@@ -46,4 +46,3 @@
 #define PRIXPTR "tX"
 
 #endif /* lib/inttypes.h */
-
