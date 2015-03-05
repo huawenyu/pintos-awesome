@@ -14,7 +14,7 @@ Please change the $HOME '/home/wilson' to your own home directory.
 source
 ------
 $ cd ~/work  
-$ git clone https://github.com/huawenyu/pintos-awesome.git  
+$ git clone https://github.com/huawenyu/pintos.git  
 
 qemu
 ----
@@ -25,14 +25,14 @@ $ sudo ln -s /bin/qemu-system-i386 /bin/qemu
 
 set run-path to tools
 ---------------------
-$ PATH=$PATH:~/work/pintos-awesome/src/utils  
+$ PATH=$PATH:~/work/pintos/src/utils  
 
 patch scripts
 -------------
 $ patch src/utils/pintos-gdb  
 ```diff
 -GDBMACROS=/usr/class/cs140/pintos/pintos/src/misc/gdb-macros
-+GDBMACROS=/home/wilson/work/pintos-awesome/src/misc/gdb-macros
++GDBMACROS=/home/wilson/work/pintos/src/misc/gdb-macros
 ```
   
 $ patch src/utils/pintos  
@@ -41,13 +41,13 @@ $ patch src/utils/pintos
 +    $sim = "qemu" if !defined $sim;
   
 -	my $name = find_file ('kernel.bin');
-+	my $name = find_file ('/home/wilson/work/pintos-awesome/src/threads/build/kernel.b<
++	my $name = find_file ('/home/wilson/work/pintos/src/threads/build/kernel.b<
 ```
   
 $ patch src/utils/Pintos.pm  
 ```diff
 -    $name = find_file ("loader.bin") if !defined $name;
-+    $name = find_file ("/home/wilson/work/pintos-awesome/src/threads/build/loader.bin") if !defined $name;
++    $name = find_file ("/home/wilson/work/pintos/src/threads/build/loader.bin") if !defined $name;
 ```
 
 patch tools code if compile fail
@@ -95,7 +95,7 @@ $ patch src/threads/Make.vars
 +SIMULATOR = --qemu
 ```
   
-$ cd ~/work/pinto-awesome/src/threads  
+$ cd ~/work/pinto/src/threads  
 $ make  
 
 run
