@@ -5,8 +5,8 @@ pintos
 The Pintos Awesome Edition  
 By Daniel Chen, Ilya Nepomnyashchiy, and Atharv Vaish  
 
-install on fedora 21 with qemu
-==============================
+install on fedora 21 with bochs|qemu
+====================================
 
 [ref](https://pintosiiith.wordpress.com/2012/09/13/install-pintos-with-qemu/)  
 Please change the $HOME '/home/wilson' to your own home directory.
@@ -16,15 +16,32 @@ source
 $ cd ~/work  
 $ git clone https://github.com/huawenyu/pintos.git  
 
-qemu
-----
+simulator-qemu
+--------------
 Fedora, qemu is called qemu-system-i386  
   
 $ sudo yum install qemu  
 $ sudo ln -s /bin/qemu-system-i386 /bin/qemu  
 
-set run-path to tools
----------------------
+simulator-bochs
+---------------
+If install from fedora using 'sudo yum install bochs', there have serval error when start bochs.  
+So we can install it from source. If download the latest tar from bochs, even have compile error.  
+So we use svn checkout the developing code and import it here.  
+
+```bash
+$ svn co http://svn.code.sf.net/p/bochs/code/trunk/bochs bochs
+$ cd bochs
+$ sudo yum install libX11-devel   <<< Xlib.h
+$ sudo yum install libXrandr-devel
+$ sudo yum install xorg-x11-server-devel
+$ ./configure LDFLAGS='-pthread'  <<< fedora gui/libgui.a(x.o): undefined reference to symbol 'XSetForeground'
+$ make
+$ sudo make install
+```
+
+set path
+--------
 $ PATH=$PATH:~/work/pintos/src/utils  
 
 patch scripts
@@ -37,8 +54,8 @@ $ patch src/utils/pintos-gdb
   
 $ patch src/utils/pintos  
 ```diff
--    $sim = "bochs" if !defined $sim;
-+    $sim = "qemu" if !defined $sim;
+-    $sim = "bochs" if !defined $sim;   <<< if using simulator-bochs
++    $sim = "qemu" if !defined $sim;    <<< if using simulator-qemu
   
 -	my $name = find_file ('kernel.bin');
 +	my $name = find_file ('/home/wilson/work/pintos/src/threads/build/kernel.b<
@@ -91,8 +108,8 @@ make pintos kernel
 ------------------
 $ patch src/threads/Make.vars  
 ```diff
--SIMULATOR = --bochs
-+SIMULATOR = --qemu
+-SIMULATOR = --bochs   <<< if using simulator-bochs
++SIMULATOR = --qemu    <<< if using simulator-qemu
 ```
   
 $ cd ~/work/pinto/src/threads  
