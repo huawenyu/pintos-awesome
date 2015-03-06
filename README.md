@@ -115,7 +115,12 @@ $ patch src/threads/Make.vars
 $ cd ~/work/pinto/src/threads  
 $ make  
 
-run
----
+check setup
+-----------
 $ pintos run alarm-multiple  
 
+TESTS
+-----
+$ cd src/threads/build
+$ make check
+$ make check VERBOSE=1    <<< output more detail info
