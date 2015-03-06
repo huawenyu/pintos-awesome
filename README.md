@@ -121,6 +121,8 @@ $ pintos run alarm-multiple
 
 TESTS
 -----
+```bash
 $ cd src/threads/build
 $ make check
 $ make check VERBOSE=1    <<< output more detail info
+```
